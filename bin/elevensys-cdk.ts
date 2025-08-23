@@ -1,21 +1,30 @@
 #!/usr/bin/env node
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import { JiraTimesheetCaptureStack } from '../lib/stacks/jira-timesheet-capture-stack';
+import { JiraTimesheetUiStack } from '../lib/stacks/jira-timesheet-ui-stack';
+
+// Load environment variables from .env file
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const app = new cdk.App();
+
+// Environment configuration
+const env = {
+  account: process.env.CDK_DEFAULT_ACCOUNT || '',
+  region: process.env.CDK_DEFAULT_REGION || '',
+};
+
+// Deploy the backend API stack
 new JiraTimesheetCaptureStack(app, 'JiraTimesheetCaptureStack', {
-  env: {
-    account: process.env.CDK_DEFAULT_ACCOUNT || '',
-    region: process.env.CDK_DEFAULT_REGION || '',
-  },
-  /* If you don't specify 'env', this stack will be environment-agnostic.
-   * Account/Region-dependent features and context lookups will not work,
-   * but a single synthesized template can be deployed anywhere. */
-  /* Uncomment the next line to specialize this stack for the AWS Account
-   * and Region that are implied by the current CLI configuration. */
-  // env: { account: process.env.CDK_DEFAULT_ACCOUNT, region: process.env.CDK_DEFAULT_REGION },
-  /* Uncomment the next line if you know exactly what Account and Region you
-   * want to deploy the stack to. */
-  // env: { account: '123456789012', region: 'us-east-1' },
-  /* For more information, see https://docs.aws.amazon.com/cdk/latest/guide/environments.html */
+  env,
+});
+
+// Deploy the static UI stack backed by S3 + CloudFront
+new JiraTimesheetUiStack(app, 'JiraTimesheetUiStack', {
+  env,
+  // Optional: path to a pre-built Next.js static export (e.g., "out").
+  // If not provided or missing, the stack will only provision infra.
+  siteDir: process.env.NEXT_STATIC_DIR || 'jira-timesheet-site',
 });

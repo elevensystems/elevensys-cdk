@@ -15,6 +15,9 @@ import { Runtime, Architecture, Tracing } from 'aws-cdk-lib/aws-lambda';
 import * as path from 'path';
 
 export class JiraTimesheetCaptureStack extends Stack {
+  // Expose the API for use in other stacks
+  public readonly api: apigateway.RestApi;
+
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
@@ -104,7 +107,7 @@ export class JiraTimesheetCaptureStack extends Stack {
     // Grant the ticket CRUD Lambda function full access to the tickets table
     ticketsTable.grantReadWriteData(ticketCrudLambda);
 
-    const api = new apigateway.RestApi(this, 'JiraTimesheetApi', {
+    this.api = new apigateway.RestApi(this, 'JiraTimesheetApi', {
       restApiName: 'Jira Timesheet Service',
       description: 'This service captures Jira timesheets.',
       deployOptions: {
@@ -116,7 +119,7 @@ export class JiraTimesheetCaptureStack extends Stack {
       },
     });
 
-    const timesheetResource = api.root.addResource('timesheet');
+    const timesheetResource = this.api.root.addResource('timesheet');
     const jiraIntegration = new apigateway.LambdaIntegration(
       jiraTimesheetLambda
     );
@@ -124,7 +127,7 @@ export class JiraTimesheetCaptureStack extends Stack {
     timesheetResource.addMethod('POST', jiraIntegration); // Consider adding an authorizer for production
 
     // Create ticket resource and methods for CRUD operations
-    const ticketsResource = api.root.addResource('tickets');
+    const ticketsResource = this.api.root.addResource('tickets');
     const ticketIntegration = new apigateway.LambdaIntegration(
       ticketCrudLambda
     );
@@ -148,7 +151,7 @@ export class JiraTimesheetCaptureStack extends Stack {
     ticketResource.addMethod('DELETE', ticketIntegration);
 
     new CfnOutput(this, 'ApiUrlOutput', {
-      value: api.url,
+      value: this.api.url,
       description: 'The URL of the API Gateway endpoint',
     });
 
