@@ -16,15 +16,30 @@ const env = {
   region: process.env.CDK_DEFAULT_REGION || '',
 };
 
-// Deploy the backend API stack
+// Configuration for API domain
+const apiDomainName = process.env.API_DOMAIN_NAME;
+const apiHostedZoneId = process.env.API_HOSTED_ZONE_ID;
+const apiCertificateArn = process.env.API_CERTIFICATE_ARN;
+const apiDomainPrefix = process.env.API_DOMAIN_PREFIX || 'api';
+
+// Configuration for UI domain
+const uiDomainName = process.env.UI_DOMAIN_NAME;
+const uiHostedZoneId = process.env.UI_HOSTED_ZONE_ID;
+const uiCertificateArn = process.env.UI_CERTIFICATE_ARN;
+
+// Deploy the backend API stack with CloudFront and custom domain
 new JiraTimesheetCaptureStack(app, 'JiraTimesheetCaptureStack', {
   env,
+  domainName: apiDomainName,
+  apiDomainPrefix,
+  hostedZoneId: apiHostedZoneId,
+  certificateArn: apiCertificateArn,
 });
 
 // Deploy the static UI stack backed by S3 + CloudFront
 new JiraTimesheetUiStack(app, 'JiraTimesheetUiStack', {
   env,
-  // Optional: path to a pre-built Next.js static export (e.g., "out").
-  // If not provided or missing, the stack will only provision infra.
-  siteDir: process.env.NEXT_STATIC_DIR || 'jira-timesheet-site',
+  domainName: uiDomainName,
+  hostedZoneId: uiHostedZoneId,
+  certificateArn: uiCertificateArn,
 });

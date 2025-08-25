@@ -1,4 +1,4 @@
-name: Deploy CDK with Next.js Artifact
+name: Deploy CDK
 
 on:
   workflow_dispatch:
@@ -10,12 +10,6 @@ jobs:
     steps:
       - name: Checkout infra repo
         uses: actions/checkout@v4
-
-      - name: Download Jira Timesheet Next.js artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: jira-timesheet-site-out
-          path: jira-timesheet-site
 
       - name: Setup Node.js
         uses: actions/setup-node@v4

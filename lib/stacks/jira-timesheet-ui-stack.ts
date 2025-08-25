@@ -1,21 +1,29 @@
-import { CfnOutput, Duration, Stack, StackProps } from 'aws-cdk-lib';
+import {
+  CfnOutput,
+  Duration,
+  RemovalPolicy,
+  Stack,
+  StackProps,
+} from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
-import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as route53 from 'aws-cdk-lib/aws-route53';
+import * as targets from 'aws-cdk-lib/aws-route53-targets';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 
 export interface JiraTimesheetUiStackProps extends StackProps {
-  // Absolute or relative path to a pre-built static Next.js export (e.g. "out"). If provided and exists, it will be uploaded.
-  siteDir?: string;
+  domainName?: string;
+  hostedZoneId?: string;
+  certificateArn?: string; // ARN of the certificate from the CertificateStack
 }
 
 export class JiraTimesheetUiStack extends Stack {
   public readonly bucket: s3.Bucket;
   public readonly distribution: cloudfront.Distribution;
+  public readonly certificate?: acm.ICertificate;
 
   constructor(
     scope: Construct,
@@ -29,6 +37,8 @@ export class JiraTimesheetUiStack extends Stack {
       encryption: s3.BucketEncryption.S3_MANAGED,
       publicReadAccess: false,
       websiteIndexDocument: 'index.html',
+      removalPolicy: RemovalPolicy.DESTROY,
+      autoDeleteObjects: true,
       // enforceSSL: true,
       // versioned for safe rollbacks; adjust as needed
       // versioned: true,
@@ -51,40 +61,68 @@ export class JiraTimesheetUiStack extends Stack {
       })
     );
 
+    // Certificate for custom domain
+    let certificate;
+    let domainNames: string[] = [];
+
+    if (props?.domainName && props?.certificateArn) {
+      // Import the certificate created in the us-east-1 region by the CertificateStack
+      certificate = acm.Certificate.fromCertificateArn(
+        this,
+        'JiraTimesheetSiteCertificate',
+        props.certificateArn
+      );
+
+      this.certificate = certificate;
+      domainNames = [props.domainName];
+    }
+
     // CloudFront distribution
     this.distribution = new cloudfront.Distribution(
       this,
       'JiraTimesheetSiteDistribution',
       {
         defaultRootObject: 'index.html',
+        domainNames,
+        certificate,
         defaultBehavior: {
           origin: origins.S3BucketOrigin.withOriginAccessIdentity(this.bucket, {
             originAccessIdentity: oai,
           }),
-          // viewerProtocolPolicy:
-          //   cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          // cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+          viewerProtocolPolicy:
+            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+          cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
           // responseHeadersPolicy:
           //   cloudfront.ResponseHeadersPolicy.SECURITY_HEADERS,
         },
+        errorResponses: [
+          {
+            httpStatus: 404,
+            responseHttpStatus: 404,
+            responsePagePath: '/404.html',
+            ttl: Duration.minutes(30),
+          },
+        ],
       }
     );
 
-    // Optional: deploy site assets if the directory is provided and exists
-    const resolvedSiteDir = props.siteDir
-      ? path.resolve(
-          this.node.tryGetContext('cwd') ?? process.cwd(),
-          props.siteDir
-        )
-      : undefined;
+    // Create Route53 alias record for the CloudFront distribution
+    if (props?.domainName && props?.hostedZoneId) {
+      const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
+        this,
+        'JiraTimesheetHostedZoneAlias',
+        {
+          hostedZoneId: props.hostedZoneId,
+          zoneName: props.domainName,
+        }
+      );
 
-    if (resolvedSiteDir && fs.existsSync(resolvedSiteDir)) {
-      new s3deploy.BucketDeployment(this, 'DeployJiraTimesheetSite', {
-        sources: [s3deploy.Source.asset(resolvedSiteDir)],
-        destinationBucket: this.bucket,
-        distribution: this.distribution,
-        distributionPaths: ['/*'],
-        prune: true,
+      new route53.ARecord(this, 'JiraTimesheetSiteAliasRecord', {
+        recordName: props.domainName,
+        target: route53.RecordTarget.fromAlias(
+          new targets.CloudFrontTarget(this.distribution)
+        ),
+        zone: hostedZone,
       });
     }
 
@@ -102,5 +140,12 @@ export class JiraTimesheetUiStack extends Stack {
       value: this.distribution.domainName,
       description: 'CloudFront distribution domain name',
     });
+
+    if (props?.domainName) {
+      new CfnOutput(this, 'CustomDomainName', {
+        value: props.domainName,
+        description: 'Custom domain name for the site',
+      });
+    }
   }
 }

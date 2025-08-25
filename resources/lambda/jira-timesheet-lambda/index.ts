@@ -10,7 +10,7 @@ import {
 } from '../../shared/utils/responseUtils';
 import { TimesheetRequest } from '../../shared/models/types';
 import payloadTemplate from './payload.json';
-import { getAllTickets } from '../../shared/utils/dynamodbUtils';
+// import { getAllTickets } from '../../shared/utils/dynamodbUtils';
 
 export const handler = async (
   event: APIGatewayProxyEvent
@@ -20,16 +20,52 @@ export const handler = async (
       return badRequestResponse('Missing request body');
     }
 
-    const { username, token } = event.headers;
-    if (!username || !token) {
-      return badRequestResponse('Missing username or token in headers');
+    const body = JSON.parse(event.body) as TimesheetRequest;
+    const { username, token, dates: rawDates, tickets } = body;
+    // Check each field individually for more specific error messages
+    if (!username) {
+      return badRequestResponse('Missing required field: username');
     }
 
-    const body = JSON.parse(event.body) as TimesheetRequest;
-    const dates = parseDates(body.dates);
+    if (!token) {
+      return badRequestResponse('Missing required field: token');
+    }
+
+    if (!rawDates) {
+      return badRequestResponse('Missing required field: dates');
+    }
+
+    if (!tickets || !Array.isArray(tickets)) {
+      return badRequestResponse(
+        'Missing or invalid tickets: must provide a tickets array'
+      );
+    }
+
+    if (tickets.length === 0) {
+      return badRequestResponse(
+        'Empty tickets array: at least one ticket is required'
+      );
+    }
+
+    // Validate ticket structure
+    const invalidTickets = tickets.filter(
+      (ticket) =>
+        !ticket.ticketId ||
+        !ticket.timeSpend ||
+        !ticket.description ||
+        !ticket.typeOfWork
+    );
+
+    if (invalidTickets.length > 0) {
+      return badRequestResponse(
+        'Invalid ticket format: each ticket must have ticketId, timeSpend, description, and typeOfWork'
+      );
+    }
+
+    const dates = parseDates(rawDates);
 
     const apiUrl = await getJiraApiUrl();
-    const tickets = await getAllTickets();
+    // const tickets = await getAllTickets();
     const headers = createJiraHeaders(token);
 
     for (const date of dates) {
