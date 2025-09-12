@@ -88,7 +88,7 @@ export const handler = async (
           typeOfWork: ticket.typeOfWork,
           startDate: date,
           endDate: date,
-          time: ` ${currentTime}`,
+          time: currentTime,
         };
 
         console.log(
