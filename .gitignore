@@ -16,7 +16,6 @@ test/**/*.js
 coverage/
 
 # npm/yarn lock files
-package-lock.json
 yarn.lock
 yarn-error.log
 
