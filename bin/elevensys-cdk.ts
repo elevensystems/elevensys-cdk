@@ -4,6 +4,7 @@ import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import { JiraTimesheetCaptureStack } from '../lib/stacks/jira-timesheet-capture-stack';
 import { JiraTimesheetUiStack } from '../lib/stacks/jira-timesheet-ui-stack';
+// import { UrlShortenerStack } from '../lib/stacks/url-shortener-stack';
 
 // Load environment variables from .env file
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
@@ -43,3 +44,6 @@ new JiraTimesheetUiStack(app, 'JiraTimesheetUiStack', {
   hostedZoneId: uiHostedZoneId,
   certificateArn: uiCertificateArn,
 });
+
+// Deploy the URL Shortener stack
+// new UrlShortenerStack(app, 'UrlShortenerStack', { env });
