@@ -15,24 +15,16 @@ import * as targets from 'aws-cdk-lib/aws-route53-targets';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 
 export interface JiraTimesheetUiStackProps extends StackProps {
-  domainName?: string;
-  hostedZoneId?: string;
-  certificateArn?: string; // ARN of the certificate from the CertificateStack
+  domainName: string;
+  hostedZoneId: string;
+  certificateArn: string; // ARN of the certificate from the CertificateStack
 }
 
 export class JiraTimesheetUiStack extends Stack {
-  public readonly bucket: s3.Bucket;
-  public readonly distribution: cloudfront.Distribution;
-  public readonly certificate?: acm.ICertificate;
-
-  constructor(
-    scope: Construct,
-    id: string,
-    props: JiraTimesheetUiStackProps = {}
-  ) {
+  constructor(scope: Construct, id: string, props: JiraTimesheetUiStackProps) {
     super(scope, id, props);
 
-    this.bucket = new s3.Bucket(this, 'JiraTimesheetSiteBucket', {
+    const bucket = new s3.Bucket(this, 'JiraTimesheetSiteBucket', {
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       encryption: s3.BucketEncryption.S3_MANAGED,
       publicReadAccess: false,
@@ -49,10 +41,10 @@ export class JiraTimesheetUiStack extends Stack {
       this,
       'JiraTimesheetSiteOAI'
     );
-    this.bucket.addToResourcePolicy(
+    bucket.addToResourcePolicy(
       new iam.PolicyStatement({
         actions: ['s3:GetObject'],
-        resources: [this.bucket.arnForObjects('*')],
+        resources: [bucket.arnForObjects('*')],
         principals: [
           new iam.CanonicalUserPrincipal(
             oai.cloudFrontOriginAccessIdentityS3CanonicalUserId
@@ -61,32 +53,22 @@ export class JiraTimesheetUiStack extends Stack {
       })
     );
 
-    // Certificate for custom domain
-    let certificate;
-    let domainNames: string[] = [];
-
-    if (props?.domainName && props?.certificateArn) {
-      // Import the certificate created in the us-east-1 region by the CertificateStack
-      certificate = acm.Certificate.fromCertificateArn(
-        this,
-        'JiraTimesheetSiteCertificate',
-        props.certificateArn
-      );
-
-      this.certificate = certificate;
-      domainNames = [props.domainName];
-    }
+    const certificate = acm.Certificate.fromCertificateArn(
+      this,
+      'JiraTimesheetSiteCertificate',
+      props.certificateArn
+    );
 
     // CloudFront distribution
-    this.distribution = new cloudfront.Distribution(
+    const distribution = new cloudfront.Distribution(
       this,
       'JiraTimesheetSiteDistribution',
       {
         defaultRootObject: 'index.html',
-        domainNames,
+        domainNames: [props.domainName],
         certificate,
         defaultBehavior: {
-          origin: origins.S3BucketOrigin.withOriginAccessIdentity(this.bucket, {
+          origin: origins.S3BucketOrigin.withOriginAccessIdentity(bucket, {
             originAccessIdentity: oai,
           }),
           viewerProtocolPolicy:
@@ -106,46 +88,41 @@ export class JiraTimesheetUiStack extends Stack {
       }
     );
 
-    // Create Route53 alias record for the CloudFront distribution
-    if (props?.domainName && props?.hostedZoneId) {
-      const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
-        this,
-        'JiraTimesheetHostedZoneAlias',
-        {
-          hostedZoneId: props.hostedZoneId,
-          zoneName: props.domainName,
-        }
-      );
+    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
+      this,
+      'JiraTimesheetHostedZoneAlias',
+      {
+        hostedZoneId: props.hostedZoneId,
+        zoneName: props.domainName,
+      }
+    );
 
-      new route53.ARecord(this, 'JiraTimesheetSiteAliasRecord', {
-        recordName: props.domainName,
-        target: route53.RecordTarget.fromAlias(
-          new targets.CloudFrontTarget(this.distribution)
-        ),
-        zone: hostedZone,
-      });
-    }
+    new route53.ARecord(this, 'JiraTimesheetSiteAliasRecord', {
+      recordName: props.domainName,
+      target: route53.RecordTarget.fromAlias(
+        new targets.CloudFrontTarget(distribution)
+      ),
+      zone: hostedZone,
+    });
 
     new CfnOutput(this, 'StaticSiteBucketName', {
-      value: this.bucket.bucketName,
+      value: bucket.bucketName,
       description: 'S3 bucket name hosting the static site',
     });
 
     new CfnOutput(this, 'CloudFrontDistributionId', {
-      value: this.distribution.distributionId,
+      value: distribution.distributionId,
       description: 'CloudFront distribution ID',
     });
 
     new CfnOutput(this, 'CloudFrontDomainName', {
-      value: this.distribution.domainName,
+      value: distribution.domainName,
       description: 'CloudFront distribution domain name',
     });
 
-    if (props?.domainName) {
-      new CfnOutput(this, 'CustomDomainName', {
-        value: props.domainName,
-        description: 'Custom domain name for the site',
-      });
-    }
+    new CfnOutput(this, 'CustomDomainName', {
+      value: props.domainName,
+      description: 'Custom domain name for the site',
+    });
   }
 }

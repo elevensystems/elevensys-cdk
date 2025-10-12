@@ -19,22 +19,12 @@ const env = {
 const redirectDomain = process.env.REDIRECT_DOMAIN_NAME || '';
 const adminDomain = process.env.ADMIN_DOMAIN_NAME || '';
 const hostedZoneId = process.env.API_HOSTED_ZONE_ID || '';
-const urlifyCertificateArn = process.env.URLIFY_CERTIFICATE_ARN || ''; // Required: ACM certificate ARN
-
-// Validate required environment variables for UrlifyStack
-if (!urlifyCertificateArn) {
-  console.error('❌ ERROR: URLIFY_CERTIFICATE_ARN is required!');
-  console.error(
-    'Please create an ACM certificate in us-east-1 and set the ARN in .env file'
-  );
-  console.error('See URLIFY_SETUP.md for detailed instructions');
-  process.exit(1);
-}
+const urlifyCertificateArn = process.env.URLIFY_CERTIFICATE_ARN || '';
 
 // Configuration for UI domain
-const uiDomainName = process.env.UI_DOMAIN_NAME;
-const uiHostedZoneId = process.env.UI_HOSTED_ZONE_ID;
-const uiCertificateArn = process.env.UI_CERTIFICATE_ARN;
+const uiDomainName = process.env.UI_DOMAIN_NAME || '';
+const uiHostedZoneId = process.env.UI_HOSTED_ZONE_ID || '';
+const uiCertificateArn = process.env.UI_CERTIFICATE_ARN || '';
 
 // Deploy the static UI stack backed by S3 + CloudFront
 new JiraTimesheetUiStack(app, 'JiraTimesheetUiStack', {

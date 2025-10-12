@@ -247,7 +247,7 @@ export class UrlifyStack extends Stack {
       {
         comment: 'Urlify URL Redirect Distribution',
         domainNames: [props.redirectDomain], // Custom domain: urlify.cc
-        certificate: certificate, // SSL certificate
+        certificate, // SSL certificate
         defaultBehavior: {
           origin: new origins.RestApiOrigin(redirectApi),
           allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
