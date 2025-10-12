@@ -3,7 +3,6 @@ import {
   DynamoDBClient,
   PutItemCommand,
   GetItemCommand,
-  UpdateItemCommand,
   DeleteItemCommand,
   ScanCommand,
 } from '@aws-sdk/client-dynamodb';
@@ -16,33 +15,18 @@ import {
   serverErrorResponse,
 } from '../../shared/utils/responseUtils';
 import { parseBodyToJson } from '../../shared/utils/httpUtils';
+import { UrlData } from '../../shared/models/urlShortenerTypes';
 
 import { randomBytes } from 'crypto';
 
 // Initialize DynamoDB Client
 const dynamoDbClient = new DynamoDBClient({});
-const TABLE_NAME = process.env.URL_SHORTENER_TABLE_NAME!;
+const TABLE_NAME = process.env.URLIFY_TABLE_NAME!;
 
 // Constants
 const TTL_DAYS = 30;
 const SHORT_CODE_LENGTH = 6;
 const BASE_URL = process.env.BASE_URL || 'https://short.url';
-
-/**
- * Interface for URL data structure
- */
-interface UrlData {
-  PK: string;
-  SK: string;
-  ShortCode: string;
-  OriginalUrl: string;
-  Clicks: number;
-  LastAccessed?: number;
-  CreatedAt: number;
-  CreatedBy?: string;
-  TTL: number;
-  EntityType: string;
-}
 
 /**
  * Generate a random short code
@@ -138,28 +122,6 @@ async function getUrlByShortCode(shortCode: string): Promise<UrlData | null> {
 }
 
 /**
- * Increment click count and update last accessed timestamp
- */
-async function incrementClicks(shortCode: string): Promise<void> {
-  await dynamoDbClient.send(
-    new UpdateItemCommand({
-      TableName: TABLE_NAME,
-      Key: marshall({
-        PK: `URL#${shortCode}`,
-        SK: 'METADATA',
-      }),
-      UpdateExpression:
-        'SET Clicks = if_not_exists(Clicks, :zero) + :inc, LastAccessed = :timestamp',
-      ExpressionAttributeValues: marshall({
-        ':inc': 1,
-        ':zero': 0,
-        ':timestamp': Date.now(),
-      }),
-    })
-  );
-}
-
-/**
  * List all URLs with pagination
  */
 async function listUrls(limit: number = 20, lastEvaluatedKey?: any) {
@@ -220,19 +182,19 @@ export const handler = async (
 
   try {
     const httpMethod = event.httpMethod;
-    const path = event.path;
+    const resource = event.resource; // Use resource instead of path (e.g., /health, not /prod/health)
     const pathParameters = event.pathParameters || {};
 
     // Health check endpoint
-    if (httpMethod === 'GET' && path === '/health') {
+    if (httpMethod === 'GET' && resource === '/health') {
       return successResponse('Service is healthy', {
         status: 'ok',
         timestamp: new Date().toISOString(),
       });
     }
 
-    // POST /api/shorten - Create shortened URL
-    if (httpMethod === 'POST' && path === '/api/shorten') {
+    // POST /shorten - Create shortened URL
+    if (httpMethod === 'POST' && resource === '/shorten') {
       const body = parseBodyToJson(event.body);
 
       if (!body || !body.originalUrl) {
@@ -263,38 +225,8 @@ export const handler = async (
       }
     }
 
-    // GET /:shortCode - Redirect to original URL
-    if (
-      httpMethod === 'GET' &&
-      pathParameters.shortCode &&
-      !path.includes('/api/')
-    ) {
-      const { shortCode } = pathParameters;
-
-      const urlData = await getUrlByShortCode(shortCode);
-
-      if (!urlData) {
-        return notFoundResponse(`Short URL not found: ${shortCode}`);
-      }
-
-      // Increment click count asynchronously (don't wait for it)
-      incrementClicks(shortCode).catch((err) =>
-        console.error('Error incrementing clicks:', err)
-      );
-
-      // Return 301 redirect
-      return {
-        statusCode: 301,
-        headers: {
-          Location: urlData.OriginalUrl,
-          'Cache-Control': 'no-cache',
-        },
-        body: '',
-      };
-    }
-
-    // GET /api/stats/:shortCode - Get URL statistics
-    if (httpMethod === 'GET' && path.includes('/api/stats/')) {
+    // GET /stats/:shortCode - Get URL statistics
+    if (httpMethod === 'GET' && resource.startsWith('/stats/')) {
       const { shortCode } = pathParameters;
 
       if (!shortCode) {
@@ -322,8 +254,8 @@ export const handler = async (
       });
     }
 
-    // GET /api/urls - List all URLs (paginated)
-    if (httpMethod === 'GET' && path === '/api/urls') {
+    // GET /urls - List all URLs (paginated)
+    if (httpMethod === 'GET' && resource === '/urls') {
       const queryParams = event.queryStringParameters || {};
       const limit = parseInt(queryParams.limit || '20');
       const lastKey = queryParams.lastKey
@@ -351,8 +283,8 @@ export const handler = async (
       });
     }
 
-    // DELETE /api/url/:shortCode - Delete a shortened URL
-    if (httpMethod === 'DELETE' && path.includes('/api/url/')) {
+    // DELETE /url/:shortCode - Delete a shortened URL
+    if (httpMethod === 'DELETE' && resource.startsWith('/url/')) {
       const { shortCode } = pathParameters;
 
       if (!shortCode) {
@@ -374,7 +306,7 @@ export const handler = async (
     }
 
     // If no route matched
-    return notFoundResponse(`Endpoint not found: ${httpMethod} ${path}`);
+    return notFoundResponse(`Endpoint not found: ${httpMethod} ${resource}`);
   } catch (error) {
     console.error('Error in URL shortener operation:', error);
     return serverErrorResponse(
