@@ -1,9 +1,8 @@
 import ssmService from '../services/ssmClient';
 
-export async function getJiraApiUrl(): Promise<string> {
-  const jiraApiUrl = await ssmService.getParameterValue(
-    '/jira-timesheet/api-url'
-  );
-  console.log(`Jira API URL: ${jiraApiUrl}`);
-  return jiraApiUrl;
+export async function getTimesheetApiUrl(): Promise<string> {
+  const getTimesheetApiUrl =
+    await ssmService.getParameterValue('timesheet-core');
+  console.log(`Timesheet API URL: ${getTimesheetApiUrl}`);
+  return getTimesheetApiUrl;
 }

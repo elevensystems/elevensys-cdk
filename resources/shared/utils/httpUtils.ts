@@ -1,5 +1,13 @@
 import axios from 'axios';
 
+/**
+ * Sleep for a specified number of milliseconds
+ * @param ms The number of milliseconds to sleep
+ */
+export async function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function sendRequest(
   url: string,
   payload: any,
