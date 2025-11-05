@@ -16,6 +16,16 @@ export const handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
   try {
+    console.log(
+      JSON.stringify({
+        msg: 'job-status invoked',
+        requestId: event.requestContext?.requestId,
+        path: event.path,
+        query: event.queryStringParameters,
+        table: TABLE_NAME,
+      })
+    );
+
     const jobId = event.queryStringParameters?.jobId;
 
     if (!jobId) {
@@ -31,6 +41,12 @@ export const handler = async (
     );
 
     if (!result.Item) {
+      console.warn(
+        JSON.stringify({
+          msg: 'job not found',
+          jobId,
+        })
+      );
       return notFoundResponse(`Job ${jobId} not found`);
     }
 
@@ -43,6 +59,17 @@ export const handler = async (
             ((jobStatus.processed + jobStatus.failed) / jobStatus.total) * 100
           )
         : 0;
+
+    console.log(
+      JSON.stringify({
+        msg: 'job status retrieved',
+        jobId,
+        total: (jobStatus as any).total,
+        processed: (jobStatus as any).processed,
+        failed: (jobStatus as any).failed,
+        progress,
+      })
+    );
 
     return successResponse('Job status retrieved successfully', {
       ...jobStatus,

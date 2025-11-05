@@ -166,12 +166,42 @@ export class TimesheetCoreStack extends Stack {
       })
     );
 
+    // Create CloudWatch log group for API Gateway access logs
+    const apiLogGroup = new logs.LogGroup(this, 'TimesheetApiLogGroup', {
+      retention: logs.RetentionDays.ONE_MONTH,
+      removalPolicy: RemovalPolicy.DESTROY,
+    });
+
     // Configure API Gateway with better CORS settings for CloudFront
     const api = new apigateway.RestApi(this, 'TimesheetCoreApi', {
       restApiName: 'Timesheet Service',
       description: 'This service captures Timesheet.',
       deployOptions: {
-        stageName: 'prod', // Use versioned API stage
+        // Use versioned API stage
+        stageName: 'prod',
+        // Enable access logging (cost-effective structured logs)
+        accessLogDestination: new apigateway.LogGroupLogDestination(
+          apiLogGroup
+        ),
+        accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
+          caller: true,
+          httpMethod: true,
+          ip: true,
+          protocol: true,
+          requestTime: true,
+          resourcePath: true,
+          responseLength: true,
+          status: true,
+          user: true,
+        }),
+        // Enable detailed CloudWatch metrics for monitoring
+        metricsEnabled: true,
+        // Disable full request/response logging (expensive - enable only for debugging)
+        dataTraceEnabled: false,
+        // Log only errors to reduce costs (change to INFO for debugging)
+        loggingLevel: apigateway.MethodLoggingLevel.ERROR,
+        // Enable X-Ray tracing (free tier covers most use cases)
+        tracingEnabled: true,
       },
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
@@ -185,6 +215,8 @@ export class TimesheetCoreStack extends Stack {
         ],
         maxAge: Duration.days(1),
       },
+      // Enable CloudWatch logging for this API
+      cloudWatchRole: true,
     });
 
     // New endpoints for SQS Fan-Out architecture
@@ -251,6 +283,16 @@ export class TimesheetCoreStack extends Stack {
     new CfnOutput(this, 'ApiCloudFrontUrlOutput', {
       value: distribution.distributionDomainName,
       description: 'The CloudFront URL for the API',
+    });
+
+    new CfnOutput(this, 'ApiGatewayUrlOutput', {
+      value: api.url,
+      description: 'The API Gateway URL (for direct testing)',
+    });
+
+    new CfnOutput(this, 'ApiLogGroupNameOutput', {
+      value: apiLogGroup.logGroupName,
+      description: 'CloudWatch Log Group for API Gateway logs',
     });
 
     new CfnOutput(this, 'JobTableNameOutput', {
