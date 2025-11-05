@@ -12,7 +12,7 @@ export async function sendRequest(
   url: string,
   payload: any,
   headers: any,
-  maxRetries: number = 5
+  maxRetries: number = 10
 ): Promise<any> {
   console.log(`Send an HTTP request to: ${url}`);
 

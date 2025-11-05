@@ -66,7 +66,7 @@ export class TimesheetCoreStack extends Stack {
     // Create SQS Queue for ticket processing
     const ticketQueue = new sqs.Queue(this, 'TimesheetTicketQueue', {
       queueName: 'timesheet-ticket-queue',
-      visibilityTimeout: Duration.seconds(120), // Should be 2x Lambda timeout (60s * 2)
+      visibilityTimeout: Duration.seconds(240), // Should be 2x Lambda timeout (120s * 2)
       receiveMessageWaitTime: Duration.seconds(20), // Long polling
       deadLetterQueue: {
         queue: deadLetterQueue,
@@ -97,6 +97,7 @@ export class TimesheetCoreStack extends Stack {
           QUEUE_URL: ticketQueue.queueUrl,
           TABLE_NAME: jobTable.tableName,
         },
+        // reservedConcurrentExecutions: 3, // Limit concurrent job creations
       }
     );
 
@@ -112,7 +113,7 @@ export class TimesheetCoreStack extends Stack {
         handler: 'handler',
         runtime: Runtime.NODEJS_20_X,
         architecture: Architecture.ARM_64,
-        timeout: Duration.seconds(60), // Sufficient for max retries with exponential backoff (~45s worst case)
+        timeout: Duration.seconds(120), // Sufficient for max retries with exponential backoff (10 retries: ~2 minutes worst case)
         memorySize: 256,
         logGroup: new logs.LogGroup(this, 'TicketWorkerLambdaLogGroup', {
           retention: logs.RetentionDays.ONE_MONTH,
@@ -122,7 +123,7 @@ export class TimesheetCoreStack extends Stack {
           NODE_OPTIONS: '--enable-source-maps',
           TABLE_NAME: jobTable.tableName,
         },
-        // reservedConcurrentExecutions: 5, // Limit concurrent executions to avoid rate limiting
+        // reservedConcurrentExecutions: 10, // Limit concurrent executions to avoid rate limiting and 429 errors
       }
     );
 
@@ -145,6 +146,7 @@ export class TimesheetCoreStack extends Stack {
         NODE_OPTIONS: '--enable-source-maps',
         TABLE_NAME: jobTable.tableName,
       },
+      // reservedConcurrentExecutions: 5, // Limit concurrent executions to prevent 429 errors
     });
 
     // Grant permissions

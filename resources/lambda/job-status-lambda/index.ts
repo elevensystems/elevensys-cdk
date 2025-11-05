@@ -52,31 +52,48 @@ export const handler = async (
 
     const jobStatus = result.Item as JobStatus;
 
+    // Ensure all required fields exist with defaults
+    const total = jobStatus.total || 0;
+    const processed = jobStatus.processed || 0;
+    const failed = jobStatus.failed || 0;
+    const status = jobStatus.status || 'unknown';
+    const errors = jobStatus.errors || [];
+
     // Calculate progress percentage
     const progress =
-      jobStatus.total > 0
-        ? Math.round(
-            ((jobStatus.processed + jobStatus.failed) / jobStatus.total) * 100
-          )
-        : 0;
+      total > 0 ? Math.round(((processed + failed) / total) * 100) : 0;
 
     console.log(
       JSON.stringify({
         msg: 'job status retrieved',
         jobId,
-        total: (jobStatus as any).total,
-        processed: (jobStatus as any).processed,
-        failed: (jobStatus as any).failed,
+        total,
+        processed,
+        failed,
         progress,
+        status,
       })
     );
 
     return successResponse('Job status retrieved successfully', {
-      ...jobStatus,
+      jobId,
+      total,
+      processed,
+      failed,
+      status,
       progress,
+      errors,
+      createdAt: jobStatus.createdAt,
+      updatedAt: jobStatus.updatedAt,
     });
   } catch (error) {
-    console.error('Error retrieving job status:', error);
+    console.error(
+      JSON.stringify({
+        msg: 'Error retrieving job status',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+      })
+    );
     return serverErrorResponse();
   }
 };
