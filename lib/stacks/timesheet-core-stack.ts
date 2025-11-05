@@ -66,36 +66,6 @@ export class TimesheetCoreStack extends Stack {
       },
     });
 
-    // TODO: Remove legacy Lambda and endpoint after confirming new SQS-based architecture is stable
-    // Legacy endpoint kept for backwards compatibility during migration period
-    // Estimated removal date: Q1 2026 (after 2-3 months of monitoring new architecture)
-
-    // const logGroup = new logs.LogGroup(this, 'TimesheetCoreLambdaLogGroup', {
-    //   retention: logs.RetentionDays.ONE_MONTH,
-    // });
-
-    // Legacy Lambda (keep for backwards compatibility during migration)
-    // const timesheetCoreLambda = new lambda.NodejsFunction(
-    //   this,
-    //   'TimesheetCoreLambda',
-    //   {
-    //     entry: path.join(
-    //       __dirname,
-    //       '../../resources/lambda/timesheet-core-lambda/index.ts'
-    //     ),
-    //     handler: 'handler',
-    //     runtime: Runtime.NODEJS_20_X,
-    //     architecture: Architecture.ARM_64,
-    //     timeout: Duration.minutes(15),
-    //     memorySize: 256,
-    //     logGroup: logGroup,
-    //     tracing: Tracing.DISABLED,
-    //     environment: {
-    //       NODE_OPTIONS: '--enable-source-maps',
-    //     },
-    //   }
-    // );
-
     // Job Creator Lambda
     const jobCreatorLambda = new lambda.NodejsFunction(
       this,
@@ -208,14 +178,6 @@ export class TimesheetCoreStack extends Stack {
         maxAge: Duration.days(1),
       },
     });
-
-    // TODO: Remove legacy endpoint after migration is complete (Q1 2026)
-    // Legacy endpoint (keep for backwards compatibility during migration)
-    // const timesheetCoreResource = api.root.addResource('timesheet');
-    // const timesheetCoreIntegration = new apigateway.LambdaIntegration(
-    //   timesheetCoreLambda
-    // );
-    // timesheetCoreResource.addMethod('POST', timesheetCoreIntegration);
 
     // New endpoints for SQS Fan-Out architecture
     // POST /jobs - Create a new job
