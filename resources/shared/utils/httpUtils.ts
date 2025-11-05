@@ -11,18 +11,41 @@ export async function sleep(ms: number): Promise<void> {
 export async function sendRequest(
   url: string,
   payload: any,
-  headers: any
+  headers: any,
+  maxRetries: number = 5
 ): Promise<any> {
   console.log(`Send an HTTP request to: ${url}`);
 
-  try {
-    const response = await axios.post(url, payload, { headers });
-    console.log(`Response [${response.status}]: ${response.data}`);
-    return response;
-  } catch (error) {
-    console.error(`Request failed: ${error}`);
-    throw error;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await axios.post(url, payload, { headers });
+      console.log(`Response [${response.status}]: ${response.data}`);
+      return response;
+    } catch (error: any) {
+      const isRateLimitError = error.response?.status === 429;
+      const isServerError = error.response?.status >= 500;
+      const shouldRetry =
+        (isRateLimitError || isServerError) && attempt < maxRetries;
+
+      if (!shouldRetry) {
+        console.error(`Request failed after ${attempt + 1} attempts: ${error}`);
+        throw error;
+      }
+
+      // Exponential backoff with jitter
+      const baseDelay = Math.min(1000 * Math.pow(2, attempt), 30000); // Max 30 seconds
+      const jitter = Math.random() * 1000; // Add 0-1 second random jitter
+      const delay = baseDelay + jitter;
+
+      console.warn(
+        `Rate limited (429) or server error. Attempt ${attempt + 1}/${maxRetries}. Retrying in ${Math.round(delay)}ms...`
+      );
+
+      await sleep(delay);
+    }
   }
+
+  throw new Error('Max retries exceeded');
 }
 
 export function createJiraHeaders(token: string): Record<string, string> {

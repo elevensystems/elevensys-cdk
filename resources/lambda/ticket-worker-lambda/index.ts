@@ -50,10 +50,8 @@ async function processRecord(record: SQSRecord, apiUrl: string): Promise<void> {
       username,
     };
 
-    await sleep(1000);
-
-    // Submit the ticket
-    await sendRequest(apiUrl, payload, headers);
+    // Submit the ticket with retry logic (exponential backoff handles rate limiting)
+    await sendRequest(apiUrl, payload, headers, 5);
 
     // Update DynamoDB: increment processed count
     await dynamoClient.send(

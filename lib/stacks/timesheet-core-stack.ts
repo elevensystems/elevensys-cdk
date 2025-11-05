@@ -58,7 +58,7 @@ export class TimesheetCoreStack extends Stack {
     // Create SQS Queue for ticket processing
     const ticketQueue = new sqs.Queue(this, 'TimesheetTicketQueue', {
       queueName: 'timesheet-ticket-queue',
-      visibilityTimeout: Duration.seconds(120), // Should be >= Lambda timeout
+      visibilityTimeout: Duration.seconds(120), // Should be 2x Lambda timeout (60s * 2)
       receiveMessageWaitTime: Duration.seconds(20), // Long polling
       deadLetterQueue: {
         queue: deadLetterQueue,
@@ -104,7 +104,7 @@ export class TimesheetCoreStack extends Stack {
         handler: 'handler',
         runtime: Runtime.NODEJS_20_X,
         architecture: Architecture.ARM_64,
-        timeout: Duration.seconds(60),
+        timeout: Duration.seconds(60), // Sufficient for max retries with exponential backoff (~45s worst case)
         memorySize: 256,
         logGroup: new logs.LogGroup(this, 'TicketWorkerLambdaLogGroup', {
           retention: logs.RetentionDays.ONE_MONTH,
@@ -114,7 +114,7 @@ export class TimesheetCoreStack extends Stack {
           NODE_OPTIONS: '--enable-source-maps',
           TABLE_NAME: jobTable.tableName,
         },
-        // reservedConcurrentExecutions: 5, // Uncomment and adjust if you need to limit concurrent executions to avoid rate limiting
+        reservedConcurrentExecutions: 5, // Limit concurrent executions to avoid rate limiting
       }
     );
 
@@ -152,8 +152,8 @@ export class TimesheetCoreStack extends Stack {
     // Configure SQS as event source for worker Lambda
     ticketWorkerLambda.addEventSource(
       new SqsEventSource(ticketQueue, {
-        batchSize: 10, // Process up to 10 messages at a time
-        maxBatchingWindow: Duration.seconds(5),
+        batchSize: 1, // Process 1 message at a time to avoid rate limiting
+        maxBatchingWindow: Duration.seconds(0),
         reportBatchItemFailures: true, // Enable partial batch responses
       })
     );
