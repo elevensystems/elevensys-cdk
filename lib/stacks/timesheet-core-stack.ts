@@ -122,7 +122,7 @@ export class TimesheetCoreStack extends Stack {
           NODE_OPTIONS: '--enable-source-maps',
           TABLE_NAME: jobTable.tableName,
         },
-        reservedConcurrentExecutions: 5, // Limit concurrent executions to avoid rate limiting
+        // reservedConcurrentExecutions: 5, // Limit concurrent executions to avoid rate limiting
       }
     );
 
