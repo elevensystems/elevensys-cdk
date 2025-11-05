@@ -18,22 +18,21 @@ const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const TABLE_NAME = process.env.TABLE_NAME!;
 
 export const handler = async (event: SQSEvent): Promise<void> => {
-  const apiUrl = await getTimesheetApiUrl();
-
   for (const record of event.Records) {
-    await processRecord(record, apiUrl);
+    await processRecord(record);
   }
 };
 
-async function processRecord(record: SQSRecord, apiUrl: string): Promise<void> {
+async function processRecord(record: SQSRecord): Promise<void> {
   try {
     const message: TicketMessage = JSON.parse(record.body);
-    const { jobId, username, date, ticket, token } = message;
+    const { jobId, username, date, ticket, token, jiraInstance } = message;
 
     console.log(
-      `Processing ticket ${ticket.ticketId} for date ${date}, job ${jobId}`
+      `Processing ticket ${ticket.ticketId} for date ${date}, job ${jobId}, jiraInstance: ${jiraInstance}`
     );
 
+    const apiUrl = await getTimesheetApiUrl(jiraInstance);
     const currentTime = getCurrentTime();
     const headers = createJiraHeaders(token);
 

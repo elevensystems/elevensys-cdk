@@ -6,10 +6,13 @@ export interface Ticket {
   [key: string]: string; // For any additional properties
 }
 
+export type JiraInstance = 'jira9' | 'jiradc';
+
 export interface TimesheetRequest {
   username: string;
   dates: string;
   tickets: Ticket[];
+  jiraInstance: JiraInstance;
   [key: string]: any;
 }
 
@@ -20,6 +23,7 @@ export interface TicketMessage {
   date: string;
   ticket: Ticket;
   token: string;
+  jiraInstance: JiraInstance;
 }
 
 export interface JobStatus {
@@ -41,6 +45,7 @@ export interface CreateJobRequest {
   username: string;
   dates: string;
   tickets: Ticket[];
+  jiraInstance: JiraInstance;
 }
 
 export interface CreateJobResponse {

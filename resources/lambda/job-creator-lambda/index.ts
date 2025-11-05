@@ -15,6 +15,11 @@ import {
   JobStatus,
 } from '../../shared/models/types';
 
+enum JiraInstance {
+  JIRA9 = 'jira9',
+  JIRADC = 'jiradc',
+}
+
 const sqsClient = new SQSClient({});
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 
@@ -44,7 +49,7 @@ export const handler = async (
     }
 
     const body = JSON.parse(event.body) as CreateJobRequest;
-    const { username, dates: rawDates, tickets } = body;
+    const { username, dates: rawDates, tickets, jiraInstance } = body;
 
     // Validation
     if (!username) {
@@ -53,6 +58,19 @@ export const handler = async (
 
     if (!rawDates) {
       return badRequestResponse('Missing required field: dates');
+    }
+
+    if (!jiraInstance) {
+      return badRequestResponse('Missing required field: jiraInstance');
+    }
+
+    if (
+      jiraInstance !== JiraInstance.JIRA9 &&
+      jiraInstance !== JiraInstance.JIRADC
+    ) {
+      return badRequestResponse(
+        'Invalid jiraInstance: must be "jira9" or "jiradc"'
+      );
     }
 
     if (!tickets || !Array.isArray(tickets)) {
@@ -115,6 +133,7 @@ export const handler = async (
           date,
           ticket,
           token,
+          jiraInstance,
         };
 
         sendPromises.push(

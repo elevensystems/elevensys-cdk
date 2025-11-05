@@ -31,12 +31,20 @@ export class TimesheetCoreStack extends Stack {
   constructor(scope: Construct, id: string, props: TimesheetCoreStackProps) {
     super(scope, id, props);
 
-    // Get the Timesheet API URL from SSM Parameter Store
-    const timesheetApiUrl = ssm.StringParameter.fromStringParameterAttributes(
+    // Get the Timesheet API URLs from SSM Parameter Store for both Jira instances
+    const jira9ApiUrl = ssm.StringParameter.fromStringParameterAttributes(
       this,
-      'TimesheetApiUrl',
+      'Jira9ApiUrl',
       {
-        parameterName: 'timesheet-core',
+        parameterName: '/timesheet-core/jira9',
+      }
+    );
+
+    const jiradcApiUrl = ssm.StringParameter.fromStringParameterAttributes(
+      this,
+      'JiradcApiUrl',
+      {
+        parameterName: '/timesheet-core/jiradc',
       }
     );
 
@@ -145,9 +153,9 @@ export class TimesheetCoreStack extends Stack {
     jobTable.grantReadWriteData(ticketWorkerLambda);
     jobTable.grantReadData(jobStatusLambda);
 
-    // Grant the Lambda functions permission to read the parameter
-    // timesheetApiUrl.grantRead(timesheetCoreLambda);
-    timesheetApiUrl.grantRead(ticketWorkerLambda);
+    // Grant the Lambda functions permission to read both Jira instance parameters
+    jira9ApiUrl.grantRead(ticketWorkerLambda);
+    jiradcApiUrl.grantRead(ticketWorkerLambda);
 
     // Configure SQS as event source for worker Lambda
     ticketWorkerLambda.addEventSource(
