@@ -32,6 +32,14 @@ export class TimesheetCoreStack extends Stack {
     super(scope, id, props);
 
     // Get the Timesheet API URLs from SSM Parameter Store for both Jira instances
+    const jira3ApiUrl = ssm.StringParameter.fromStringParameterAttributes(
+      this,
+      'Jira3ApiUrl',
+      {
+        parameterName: '/timesheet-core/jira3',
+      }
+    );
+
     const jira9ApiUrl = ssm.StringParameter.fromStringParameterAttributes(
       this,
       'Jira9ApiUrl',
@@ -113,7 +121,7 @@ export class TimesheetCoreStack extends Stack {
         handler: 'handler',
         runtime: Runtime.NODEJS_20_X,
         architecture: Architecture.ARM_64,
-        timeout: Duration.seconds(120), // Sufficient for max retries with exponential backoff (10 retries: ~2 minutes worst case)
+        timeout: Duration.seconds(120),
         memorySize: 256,
         logGroup: new logs.LogGroup(this, 'TicketWorkerLambdaLogGroup', {
           retention: logs.RetentionDays.ONE_MONTH,
@@ -156,6 +164,7 @@ export class TimesheetCoreStack extends Stack {
     jobTable.grantReadData(jobStatusLambda);
 
     // Grant the Lambda functions permission to read both Jira instance parameters
+    jira3ApiUrl.grantRead(ticketWorkerLambda);
     jira9ApiUrl.grantRead(ticketWorkerLambda);
     jiradcApiUrl.grantRead(ticketWorkerLambda);
 

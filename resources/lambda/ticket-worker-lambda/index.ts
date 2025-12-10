@@ -6,11 +6,7 @@ import {
   GetCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { getTimesheetApiUrl } from '../../shared/utils/ssmUtils';
-import {
-  sendRequest,
-  createJiraHeaders,
-  sleep,
-} from '../../shared/utils/httpUtils';
+import { sendRequest, createJiraHeaders } from '../../shared/utils/httpUtils';
 import { getCurrentTime } from '../../shared/utils/dateUtils';
 import { TicketMessage } from '../../shared/models/types';
 
@@ -44,15 +40,13 @@ async function processRecord(record: SQSRecord): Promise<void> {
       remainingTime: 0,
       startDate: date,
       time: ` ${currentTime}`,
-      timeSpend: parseFloat(ticket.timeSpend) * 3600, // Convert hours (string) to seconds
+      timeSpend: parseFloat(ticket.timeSpend) * 3600,
       typeOfWork: ticket.typeOfWork,
       username,
     };
 
-    // Submit the ticket with retry logic (exponential backoff handles rate limiting)
     await sendRequest(apiUrl, payload, headers, 10);
 
-    // Update DynamoDB: increment processed count
     await dynamoClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
@@ -80,7 +74,6 @@ async function processRecord(record: SQSRecord): Promise<void> {
     if (result.Item) {
       const { total, processed, failed } = result.Item;
       if (processed + failed >= total) {
-        // Mark job as complete
         await dynamoClient.send(
           new UpdateCommand({
             TableName: TABLE_NAME,
@@ -104,11 +97,9 @@ async function processRecord(record: SQSRecord): Promise<void> {
   } catch (error) {
     console.error('Error processing ticket:', error);
 
-    // Extract job info from message
     const message: TicketMessage = JSON.parse(record.body);
     const { jobId, ticket, date } = message;
 
-    // Update DynamoDB: increment failed count and add error
     await dynamoClient.send(
       new UpdateCommand({
         TableName: TABLE_NAME,
@@ -134,7 +125,6 @@ async function processRecord(record: SQSRecord): Promise<void> {
       })
     );
 
-    // Check if job is complete (even with failures)
     const result = await dynamoClient.send(
       new GetCommand({
         TableName: TABLE_NAME,

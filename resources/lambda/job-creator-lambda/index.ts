@@ -16,6 +16,7 @@ import {
 } from '../../shared/models/types';
 
 enum JiraInstance {
+  JIRA3 = 'jira3',
   JIRA9 = 'jira9',
   JIRADC = 'jiradc',
 }
@@ -65,11 +66,12 @@ export const handler = async (
     }
 
     if (
+      jiraInstance !== JiraInstance.JIRA3 &&
       jiraInstance !== JiraInstance.JIRA9 &&
       jiraInstance !== JiraInstance.JIRADC
     ) {
       return badRequestResponse(
-        'Invalid jiraInstance: must be "jira9" or "jiradc"'
+        'Invalid jiraInstance: must be, "jira3", "jira9", or "jiradc"'
       );
     }
 

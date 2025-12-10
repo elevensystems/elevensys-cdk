@@ -48,7 +48,10 @@ export async function sendRequest(
   throw new Error('Max retries exceeded');
 }
 
-export function createJiraHeaders(token: string): Record<string, string> {
+export function createJiraHeaders(
+  token: string,
+  jiraSystem: 'jira3' | 'jira9' | 'jiradc' = 'jira9'
+): Record<string, string> {
   return {
     Connection: 'close',
     'Accept-Encoding': 'None',
@@ -57,7 +60,7 @@ export function createJiraHeaders(token: string): Record<string, string> {
     'content-type': 'application/json',
     origin: 'https://insight.fsoft.com.vn',
     priority: 'u=0, i',
-    referer: 'https://insight.fsoft.com.vn/jira9/browse/EONHOMEGRIDX-25',
+    referer: `https://insight.fsoft.com.vn/${jiraSystem}/browse/EONHOMEGRIDX-25`,
     'sec-ch-ua':
       '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
     'sec-ch-ua-mobile': '?0',

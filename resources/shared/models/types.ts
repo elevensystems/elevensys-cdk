@@ -6,7 +6,7 @@ export interface Ticket {
   [key: string]: string; // For any additional properties
 }
 
-export type JiraInstance = 'jira9' | 'jiradc';
+export type JiraInstance = 'jira3' | 'jira9' | 'jiradc';
 
 export interface TimesheetRequest {
   username: string;
