@@ -121,7 +121,7 @@ export class TimesheetCoreStack extends Stack {
         handler: 'handler',
         runtime: Runtime.NODEJS_20_X,
         architecture: Architecture.ARM_64,
-        timeout: Duration.seconds(120),
+        timeout: Duration.minutes(5),
         memorySize: 256,
         logGroup: new logs.LogGroup(this, 'TicketWorkerLambdaLogGroup', {
           retention: logs.RetentionDays.ONE_MONTH,
@@ -144,7 +144,7 @@ export class TimesheetCoreStack extends Stack {
       handler: 'handler',
       runtime: Runtime.NODEJS_20_X,
       architecture: Architecture.ARM_64,
-      timeout: Duration.seconds(10),
+      timeout: Duration.seconds(15),
       memorySize: 256,
       logGroup: new logs.LogGroup(this, 'JobStatusLambdaLogGroup', {
         retention: logs.RetentionDays.ONE_MONTH,
