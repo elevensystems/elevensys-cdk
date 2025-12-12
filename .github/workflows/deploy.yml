@@ -2,6 +2,16 @@ name: Deploy CDK
 
 on:
   workflow_dispatch:
+    inputs:
+      stack:
+        description: 'Stack to deploy (leave empty for all stacks)'
+        required: false
+        type: string
+      require_approval:
+        description: 'Require manual approval before deployment'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   deploy:
@@ -27,4 +37,12 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
-        run: cdk deploy --require-approval never
+        run: |
+          STACK_ARG="${{ github.event.inputs.stack }}"
+          APPROVAL_ARG="${{ github.event.inputs.require_approval == 'true' && '' || '--require-approval never' }}"
+
+          if [ -n "$STACK_ARG" ]; then
+            cdk deploy $STACK_ARG $APPROVAL_ARG
+          else
+            cdk deploy --all $APPROVAL_ARG
+          fi
