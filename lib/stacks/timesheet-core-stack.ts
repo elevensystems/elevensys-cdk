@@ -8,7 +8,6 @@ import {
 import { Construct } from 'constructs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as lambda from 'aws-cdk-lib/aws-lambda-nodejs';
-import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as sqs from 'aws-cdk-lib/aws-sqs';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -31,31 +30,6 @@ export class TimesheetCoreStack extends Stack {
   constructor(scope: Construct, id: string, props: TimesheetCoreStackProps) {
     super(scope, id, props);
 
-    // Get the Timesheet API URLs from SSM Parameter Store for both Jira instances
-    const jira3ApiUrl = ssm.StringParameter.fromStringParameterAttributes(
-      this,
-      'Jira3ApiUrl',
-      {
-        parameterName: '/timesheet-core/jira3',
-      }
-    );
-
-    const jira9ApiUrl = ssm.StringParameter.fromStringParameterAttributes(
-      this,
-      'Jira9ApiUrl',
-      {
-        parameterName: '/timesheet-core/jira9',
-      }
-    );
-
-    const jiradcApiUrl = ssm.StringParameter.fromStringParameterAttributes(
-      this,
-      'JiradcApiUrl',
-      {
-        parameterName: '/timesheet-core/jiradc',
-      }
-    );
-
     // Create DynamoDB table for job tracking
     const jobTable = new dynamodb.Table(this, 'TimesheetJobTable', {
       partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING },
@@ -74,7 +48,7 @@ export class TimesheetCoreStack extends Stack {
     // Create SQS Queue for ticket processing
     const ticketQueue = new sqs.Queue(this, 'TimesheetTicketQueue', {
       queueName: 'timesheet-ticket-queue',
-      visibilityTimeout: Duration.seconds(240), // Should be 2x Lambda timeout (120s * 2)
+      visibilityTimeout: Duration.minutes(12), // Must exceed Lambda timeout to prevent duplicates
       receiveMessageWaitTime: Duration.seconds(20), // Long polling
       deadLetterQueue: {
         queue: deadLetterQueue,
@@ -121,7 +95,7 @@ export class TimesheetCoreStack extends Stack {
         handler: 'handler',
         runtime: Runtime.NODEJS_20_X,
         architecture: Architecture.ARM_64,
-        timeout: Duration.minutes(5),
+        timeout: Duration.minutes(10),
         memorySize: 256,
         logGroup: new logs.LogGroup(this, 'TicketWorkerLambdaLogGroup', {
           retention: logs.RetentionDays.ONE_MONTH,
@@ -163,25 +137,14 @@ export class TimesheetCoreStack extends Stack {
     jobTable.grantReadWriteData(ticketWorkerLambda);
     jobTable.grantReadData(jobStatusLambda);
 
-    // Grant the Lambda functions permission to read both Jira instance parameters
-    jira3ApiUrl.grantRead(ticketWorkerLambda);
-    jira9ApiUrl.grantRead(ticketWorkerLambda);
-    jiradcApiUrl.grantRead(ticketWorkerLambda);
-
     // Configure SQS as event source for worker Lambda
     ticketWorkerLambda.addEventSource(
       new SqsEventSource(ticketQueue, {
-        batchSize: 1, // Process 1 message at a time to avoid rate limiting
-        maxBatchingWindow: Duration.seconds(0),
+        batchSize: 10, // Process 10 messages at a time
+        maxBatchingWindow: Duration.seconds(3),
         reportBatchItemFailures: true, // Enable partial batch responses
       })
     );
-
-    // Create CloudWatch log group for API Gateway access logs
-    const apiLogGroup = new logs.LogGroup(this, 'TimesheetApiLogGroup', {
-      retention: logs.RetentionDays.ONE_MONTH,
-      removalPolicy: RemovalPolicy.DESTROY,
-    });
 
     // Configure API Gateway with better CORS settings for CloudFront
     const api = new apigateway.RestApi(this, 'TimesheetCoreApi', {
@@ -190,27 +153,12 @@ export class TimesheetCoreStack extends Stack {
       deployOptions: {
         // Use versioned API stage
         stageName: 'prod',
-        // Enable access logging (cost-effective structured logs)
-        accessLogDestination: new apigateway.LogGroupLogDestination(
-          apiLogGroup
-        ),
-        accessLogFormat: apigateway.AccessLogFormat.jsonWithStandardFields({
-          caller: true,
-          httpMethod: true,
-          ip: true,
-          protocol: true,
-          requestTime: true,
-          resourcePath: true,
-          responseLength: true,
-          status: true,
-          user: true,
-        }),
-        // Enable detailed CloudWatch metrics for monitoring
-        metricsEnabled: true,
-        // Disable full request/response logging (expensive - enable only for debugging)
+        // Disable API Gateway execution/access logging to CloudWatch
+        accessLogDestination: undefined,
+        accessLogFormat: undefined,
+        metricsEnabled: false,
         dataTraceEnabled: false,
-        // Log only errors to reduce costs (change to INFO for debugging)
-        loggingLevel: apigateway.MethodLoggingLevel.ERROR,
+        loggingLevel: apigateway.MethodLoggingLevel.OFF,
         // Enable X-Ray tracing (free tier covers most use cases)
         tracingEnabled: true,
       },
@@ -299,11 +247,6 @@ export class TimesheetCoreStack extends Stack {
     new CfnOutput(this, 'ApiGatewayUrlOutput', {
       value: api.url,
       description: 'The API Gateway URL (for direct testing)',
-    });
-
-    new CfnOutput(this, 'ApiLogGroupNameOutput', {
-      value: apiLogGroup.logGroupName,
-      description: 'CloudWatch Log Group for API Gateway logs',
     });
 
     new CfnOutput(this, 'JobTableNameOutput', {

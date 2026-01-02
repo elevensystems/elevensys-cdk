@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { JiraInstance } from '../models/types';
 
 /**
  * Sleep for a specified number of milliseconds
@@ -8,6 +9,14 @@ export async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+/**
+ * Send an HTTP POST request with retry logic for rate limiting and server errors
+ * @param url The URL to send the request to
+ * @param payload The payload to send in the request body
+ * @param headers The headers to include in the request
+ * @param maxRetries The maximum number of retries (default: 10)
+ * @returns The response from the server
+ */
 export async function sendRequest(
   url: string,
   payload: any,
@@ -18,7 +27,10 @@ export async function sendRequest(
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      const response = await axios.post(url, payload, { headers });
+      const response = await axios.post(url, payload, {
+        headers,
+        timeout: 15000, // 15 second timeout per request
+      });
       console.log(`Response [${response.status}]: ${response.data}`);
       return response;
     } catch (error: any) {
@@ -50,7 +62,7 @@ export async function sendRequest(
 
 export function createJiraHeaders(
   token: string,
-  jiraSystem: 'jira3' | 'jira9' | 'jiradc' = 'jira9'
+  jiraSystem: JiraInstance = 'jira9'
 ): Record<string, string> {
   return {
     Connection: 'close',

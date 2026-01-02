@@ -5,19 +5,22 @@ import {
   UpdateCommand,
   GetCommand,
 } from '@aws-sdk/lib-dynamodb';
-import { getTimesheetApiUrl } from '../../shared/utils/ssmUtils';
-import { sendRequest, createJiraHeaders } from '../../shared/utils/httpUtils';
+import {
+  sendRequest,
+  createJiraHeaders,
+  sleep,
+} from '../../shared/utils/httpUtils';
 import { getCurrentTime } from '../../shared/utils/dateUtils';
-import { TicketMessage } from '../../shared/models/types';
+import { JiraInstance, TicketMessage } from '../../shared/models/types';
 
 const dynamoClient = DynamoDBDocumentClient.from(new DynamoDBClient({}));
 const TABLE_NAME = process.env.TABLE_NAME!;
 
-export const handler = async (event: SQSEvent): Promise<void> => {
-  for (const record of event.Records) {
-    await processRecord(record);
-  }
-};
+function getTimesheetApiUrl(jiraInstance: JiraInstance): string {
+  const apiUrl = `https://insight.fsoft.com.vn/${jiraInstance}/rest/tempo/1.0/log-work/create-log-work`;
+  console.log(`Timesheet API URL for ${jiraInstance}: ${apiUrl}`);
+  return apiUrl;
+}
 
 async function processRecord(record: SQSRecord): Promise<void> {
   try {
@@ -28,7 +31,7 @@ async function processRecord(record: SQSRecord): Promise<void> {
       `Processing ticket ${ticket.ticketId} for date ${date}, job ${jobId}, jiraInstance: ${jiraInstance}`
     );
 
-    const apiUrl = await getTimesheetApiUrl(jiraInstance);
+    const apiUrl = getTimesheetApiUrl(jiraInstance);
     const currentTime = getCurrentTime();
     const headers = createJiraHeaders(token);
 
@@ -45,7 +48,7 @@ async function processRecord(record: SQSRecord): Promise<void> {
       username,
     };
 
-    await sendRequest(apiUrl, payload, headers, 10);
+    await sendRequest(apiUrl, payload, headers);
 
     await dynamoClient.send(
       new UpdateCommand({
@@ -153,3 +156,10 @@ async function processRecord(record: SQSRecord): Promise<void> {
     }
   }
 }
+
+export const handler = async (event: SQSEvent): Promise<void> => {
+  for (const record of event.Records) {
+    await processRecord(record);
+    await sleep(1000);
+  }
+};
