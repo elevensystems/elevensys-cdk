@@ -66,7 +66,6 @@ async function processRecord(record: SQSRecord): Promise<void> {
       })
     );
 
-    // Check if job is complete
     const result = await dynamoClient.send(
       new GetCommand({
         TableName: TABLE_NAME,

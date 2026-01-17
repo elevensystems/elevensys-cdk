@@ -10,6 +10,6 @@ export interface UrlData {
   LastAccessed?: number;
   CreatedAt: number;
   CreatedBy?: string;
-  TTL: number;
+  TTL?: number;
   EntityType: string;
 }

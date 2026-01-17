@@ -32,7 +32,6 @@ export const handler = async (
       return badRequestResponse('Missing required query parameter: jobId');
     }
 
-    // Retrieve job status from DynamoDB
     const result = await dynamoClient.send(
       new GetCommand({
         TableName: TABLE_NAME,
@@ -52,14 +51,12 @@ export const handler = async (
 
     const jobStatus = result.Item as JobStatus;
 
-    // Ensure all required fields exist with defaults
     const total = jobStatus.total || 0;
     const processed = jobStatus.processed || 0;
     const failed = jobStatus.failed || 0;
     const status = jobStatus.status || 'unknown';
     const errors = jobStatus.errors || [];
 
-    // Calculate progress percentage
     const progress =
       total > 0 ? Math.round(((processed + failed) / total) * 100) : 0;
 

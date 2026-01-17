@@ -8,7 +8,6 @@ import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
 import { notFoundResponse } from '../../shared/utils/responseUtils';
 import { UrlData } from '../../shared/models/urlShortenerTypes';
 
-// Initialize DynamoDB Client
 const dynamoDbClient = new DynamoDBClient({});
 const TABLE_NAME = process.env.URLIFY_TABLE_NAME!;
 
@@ -87,7 +86,6 @@ export const handler = async (
       console.error('Error incrementing clicks:', err)
     );
 
-    // Return 301 redirect
     return {
       statusCode: 301,
       headers: {
@@ -99,7 +97,6 @@ export const handler = async (
   } catch (error) {
     console.error('Error in URL redirect operation:', error);
 
-    // Return a generic 404 for any errors to avoid exposing internals
     return notFoundResponse('Short URL not found');
   }
 };

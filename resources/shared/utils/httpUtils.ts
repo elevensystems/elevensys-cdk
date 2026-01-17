@@ -29,7 +29,7 @@ export async function sendRequest(
     try {
       const response = await axios.post(url, payload, {
         headers,
-        timeout: 15000, // 15 second timeout per request
+        timeout: 15000,
       });
       console.log(`Response [${response.status}]: ${response.data}`);
       return response;
@@ -45,8 +45,8 @@ export async function sendRequest(
       }
 
       // Exponential backoff with jitter
-      const baseDelay = Math.min(1000 * Math.pow(2, attempt), 30000); // Max 30 seconds
-      const jitter = Math.random() * 1000; // Add 0-1 second random jitter
+      const baseDelay = Math.min(1000 * Math.pow(2, attempt), 30000);
+      const jitter = Math.random() * 1000;
       const delay = baseDelay + jitter;
 
       console.warn(

@@ -14,49 +14,58 @@ import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Runtime, Architecture, Tracing } from 'aws-cdk-lib/aws-lambda';
 import * as path from 'path';
-import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
-import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
-import * as route53 from 'aws-cdk-lib/aws-route53';
-import * as targets from 'aws-cdk-lib/aws-route53-targets';
-import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 
+/**
+ * TimesheetCoreStack - Timesheet Processing Service
+ *
+ * This stack adds /timesheet endpoints to the base API Gateway.
+ * Endpoint: https://api.elevensys.dev/timesheet
+ *
+ * Architecture:
+ * - 3 Lambda Functions (Job Creator, Ticket Worker, Job Status)
+ * - SQS Queue for asynchronous ticket processing
+ * - DynamoDB Table for job tracking
+ * - Dead Letter Queue for failed messages
+ *
+ * Prerequisites:
+ * - BaseApiStack must be deployed first
+ *
+ * Endpoints:
+ * - POST /timesheet/jobs - Create a new job
+ * - GET /timesheet/jobs/status?jobId=xxx - Get job status
+ */
 export interface TimesheetCoreStackProps extends StackProps {
-  domainName: string;
-  hostedZoneId: string;
-  certificateArn: string;
+  api: apigateway.RestApi; // Base API Gateway from BaseApiStack
+  baseApiUrl: string; // Base API URL (e.g., 'https://api.elevensys.dev')
 }
 
 export class TimesheetCoreStack extends Stack {
   constructor(scope: Construct, id: string, props: TimesheetCoreStackProps) {
     super(scope, id, props);
 
-    // Create DynamoDB table for job tracking
     const jobTable = new dynamodb.Table(this, 'TimesheetJobTable', {
       partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
-      removalPolicy: RemovalPolicy.DESTROY, // Change to RETAIN for production
+      removalPolicy: RemovalPolicy.DESTROY,
       pointInTimeRecovery: true,
-      timeToLiveAttribute: 'ttl', // Optional: auto-delete old jobs after 7 days
+      timeToLiveAttribute: 'ttl',
     });
 
-    // Create Dead Letter Queue for failed messages
     const deadLetterQueue = new sqs.Queue(this, 'TimesheetDLQ', {
       queueName: 'timesheet-dlq',
       retentionPeriod: Duration.days(4),
     });
 
-    // Create SQS Queue for ticket processing
     const ticketQueue = new sqs.Queue(this, 'TimesheetTicketQueue', {
       queueName: 'timesheet-ticket-queue',
-      visibilityTimeout: Duration.minutes(12), // Must exceed Lambda timeout to prevent duplicates
-      receiveMessageWaitTime: Duration.seconds(20), // Long polling
+      visibilityTimeout: Duration.minutes(12),
+      receiveMessageWaitTime: Duration.seconds(20),
       deadLetterQueue: {
         queue: deadLetterQueue,
-        maxReceiveCount: 2, // Retry 2 times before sending to DLQ
+        maxReceiveCount: 2,
       },
     });
 
-    // Job Creator Lambda
     const jobCreatorLambda = new lambda.NodejsFunction(
       this,
       'JobCreatorLambda',
@@ -79,11 +88,9 @@ export class TimesheetCoreStack extends Stack {
           QUEUE_URL: ticketQueue.queueUrl,
           TABLE_NAME: jobTable.tableName,
         },
-        // reservedConcurrentExecutions: 3, // Limit concurrent job creations
       }
     );
 
-    // Ticket Worker Lambda
     const ticketWorkerLambda = new lambda.NodejsFunction(
       this,
       'TicketWorkerLambda',
@@ -105,11 +112,9 @@ export class TimesheetCoreStack extends Stack {
           NODE_OPTIONS: '--enable-source-maps',
           TABLE_NAME: jobTable.tableName,
         },
-        // reservedConcurrentExecutions: 10, // Limit concurrent executions to avoid rate limiting and 429 errors
       }
     );
 
-    // Job Status Lambda
     const jobStatusLambda = new lambda.NodejsFunction(this, 'JobStatusLambda', {
       entry: path.join(
         __dirname,
@@ -131,122 +136,36 @@ export class TimesheetCoreStack extends Stack {
       // reservedConcurrentExecutions: 5, // Limit concurrent executions to prevent 429 errors
     });
 
-    // Grant permissions
     ticketQueue.grantSendMessages(jobCreatorLambda);
     jobTable.grantWriteData(jobCreatorLambda);
     jobTable.grantReadWriteData(ticketWorkerLambda);
     jobTable.grantReadData(jobStatusLambda);
 
-    // Configure SQS as event source for worker Lambda
     ticketWorkerLambda.addEventSource(
       new SqsEventSource(ticketQueue, {
-        batchSize: 10, // Process 10 messages at a time
+        batchSize: 10,
         maxBatchingWindow: Duration.seconds(3),
-        reportBatchItemFailures: true, // Enable partial batch responses
+        reportBatchItemFailures: true,
       })
     );
 
-    // Configure API Gateway with better CORS settings for CloudFront
-    const api = new apigateway.RestApi(this, 'TimesheetCoreApi', {
-      restApiName: 'Timesheet Service',
-      description: 'This service captures Timesheet.',
-      deployOptions: {
-        // Use versioned API stage
-        stageName: 'prod',
-        // Disable API Gateway execution/access logging to CloudWatch
-        accessLogDestination: undefined,
-        accessLogFormat: undefined,
-        metricsEnabled: false,
-        dataTraceEnabled: false,
-        loggingLevel: apigateway.MethodLoggingLevel.OFF,
-        // Enable X-Ray tracing (free tier covers most use cases)
-        tracingEnabled: true,
-      },
-      defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
-        allowMethods: apigateway.Cors.ALL_METHODS,
-        allowHeaders: [
-          'Content-Type',
-          'X-Amz-Date',
-          'Authorization',
-          'X-Api-Key',
-          'X-Amz-Security-Token',
-        ],
-        maxAge: Duration.days(1),
-      },
-      // Enable CloudWatch logging for this API
-      cloudWatchRole: true,
-    });
+    const timesheetResource = props.api.root.addResource('timesheet');
 
-    // New endpoints for SQS Fan-Out architecture
-    // POST /jobs - Create a new job
-    const jobsResource = api.root.addResource('jobs');
+    const jobsResource = timesheetResource.addResource('jobs');
     const jobCreatorIntegration = new apigateway.LambdaIntegration(
       jobCreatorLambda
     );
     jobsResource.addMethod('POST', jobCreatorIntegration);
 
-    // GET /jobs/status?jobId=xxx - Get job status
     const jobStatusResource = jobsResource.addResource('status');
     const jobStatusIntegration = new apigateway.LambdaIntegration(
       jobStatusLambda
     );
     jobStatusResource.addMethod('GET', jobStatusIntegration);
 
-    // Import existing certificate for CloudFront (must be in us-east-1)
-    const certificate = acm.Certificate.fromCertificateArn(
-      this,
-      'TimesheetCoreCertificate',
-      props.certificateArn
-    );
-
-    // Create CloudFront distribution for API
-    const distribution = new cloudfront.Distribution(
-      this,
-      'TimesheetCoreApiDistribution',
-      {
-        domainNames: [props.domainName],
-        certificate,
-        defaultBehavior: {
-          origin: new origins.RestApiOrigin(api),
-          allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
-          cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED, // API responses should not be cached by default
-          originRequestPolicy:
-            cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-          viewerProtocolPolicy:
-            cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-        },
-        priceClass: cloudfront.PriceClass.PRICE_CLASS_200,
-      }
-    );
-
-    // Create Route53 alias record for the CloudFront distribution
-    const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
-      this,
-      'TimesheetCoreHostedZone',
-      {
-        hostedZoneId: props.hostedZoneId,
-        zoneName: props.domainName,
-      }
-    );
-
-    // Create A record for the API subdomain
-    new route53.ARecord(this, 'TimesheetCoreApiAliasRecord', {
-      recordName: props.domainName,
-      target: route53.RecordTarget.fromAlias(
-        new targets.CloudFrontTarget(distribution)
-      ),
-      zone: hostedZone,
-    });
-
-    new CfnOutput(this, 'ApiCloudFrontUrlOutput', {
-      value: distribution.distributionDomainName,
-      description: 'The CloudFront URL for the API',
-    });
-
-    new CfnOutput(this, 'ApiGatewayUrlOutput', {
-      value: api.url,
-      description: 'The API Gateway URL (for direct testing)',
+    new CfnOutput(this, 'TimesheetApiUrlOutput', {
+      value: `${props.baseApiUrl}/timesheet`,
+      description: 'Timesheet API endpoint URL',
     });
 
     new CfnOutput(this, 'JobTableNameOutput', {

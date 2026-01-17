@@ -24,9 +24,9 @@ const dynamoDbClient = new DynamoDBClient({});
 const TABLE_NAME = process.env.URLIFY_TABLE_NAME!;
 
 // Constants
-const TTL_DAYS = 30;
 const SHORT_CODE_LENGTH = 6;
 const BASE_URL = process.env.BASE_URL || 'https://short.url';
+const DEFAULT_TTL_DAYS = 30;
 
 /**
  * Generate a random short code
@@ -51,10 +51,10 @@ function isValidUrl(url: string): boolean {
 }
 
 /**
- * Calculate TTL timestamp (30 days from now)
+ * Calculate TTL timestamp (days from now)
  */
-function calculateTTL(): number {
-  return Math.floor(Date.now() / 1000) + TTL_DAYS * 24 * 60 * 60;
+function calculateTTL(days: number): number {
+  return Math.floor(Date.now() / 1000) + days * 24 * 60 * 60;
 }
 
 /**
@@ -62,7 +62,8 @@ function calculateTTL(): number {
  */
 async function createShortUrl(
   originalUrl: string,
-  createdBy?: string
+  createdBy?: string,
+  ttlDays?: number
 ): Promise<UrlData> {
   // Validate URL
   if (!isValidUrl(originalUrl)) {
@@ -71,8 +72,6 @@ async function createShortUrl(
 
   const shortCode = generateShortCode();
   const now = Date.now();
-  const ttl = calculateTTL();
-
   const urlData: UrlData = {
     PK: `URL#${shortCode}`,
     SK: 'METADATA',
@@ -80,9 +79,12 @@ async function createShortUrl(
     OriginalUrl: originalUrl,
     Clicks: 0,
     CreatedAt: now,
-    TTL: ttl,
     EntityType: 'URL',
   };
+
+  if (ttlDays && ttlDays > 0) {
+    urlData.TTL = calculateTTL(ttlDays);
+  }
 
   if (createdBy) {
     urlData.CreatedBy = createdBy;
@@ -158,7 +160,7 @@ async function deleteUrl(shortCode: string): Promise<boolean> {
           PK: `URL#${shortCode}`,
           SK: 'METADATA',
         }),
-        ConditionExpression: 'attribute_exists(PK)', // Ensure item exists
+        ConditionExpression: 'attribute_not_exists(PK)',
       })
     );
     return true;
@@ -182,19 +184,18 @@ export const handler = async (
 
   try {
     const httpMethod = event.httpMethod;
-    const resource = event.resource; // Use resource instead of path (e.g., /health, not /prod/health)
+    const resource = event.resource || '';
     const pathParameters = event.pathParameters || {};
+    const normalizedResource = resource.replace(/^\/urlify/, '');
 
-    // Health check endpoint
-    if (httpMethod === 'GET' && resource === '/health') {
+    if (httpMethod === 'GET' && normalizedResource === '/health') {
       return successResponse('Service is healthy', {
         status: 'ok',
         timestamp: new Date().toISOString(),
       });
     }
 
-    // POST /shorten - Create shortened URL
-    if (httpMethod === 'POST' && resource === '/shorten') {
+    if (httpMethod === 'POST' && normalizedResource === '/shorten') {
       const body = parseBodyToJson(event.body);
 
       if (!body || !body.originalUrl) {
@@ -203,17 +204,50 @@ export const handler = async (
         ]);
       }
 
-      const { originalUrl, createdBy } = body;
+      const { originalUrl, createdBy, autoDelete, ttlDays } = body;
+
+      if (
+        ttlDays !== undefined &&
+        (typeof ttlDays !== 'number' || ttlDays <= 0)
+      ) {
+        return badRequestResponse('Invalid ttlDays value', [
+          {
+            code: 'INVALID_TTL_DAYS',
+            detail: 'ttlDays must be a positive number of days',
+          },
+        ]);
+      }
+
+      if (autoDelete !== undefined && typeof autoDelete !== 'boolean') {
+        return badRequestResponse('Invalid autoDelete value', [
+          {
+            code: 'INVALID_AUTO_DELETE',
+            detail: 'autoDelete must be a boolean',
+          },
+        ]);
+      }
+
+      const resolvedTtlDays = autoDelete
+        ? (ttlDays ?? DEFAULT_TTL_DAYS)
+        : undefined;
 
       try {
-        const urlData = await createShortUrl(originalUrl, createdBy);
+        const urlData = await createShortUrl(
+          originalUrl,
+          createdBy,
+          resolvedTtlDays
+        );
+
+        const expiresAt = urlData.TTL
+          ? new Date(urlData.TTL * 1000).toISOString()
+          : undefined;
 
         return createdResponse('URL shortened successfully', {
           shortCode: urlData.ShortCode,
           shortUrl: `${BASE_URL}/${urlData.ShortCode}`,
           originalUrl: urlData.OriginalUrl,
           createdAt: new Date(urlData.CreatedAt).toISOString(),
-          expiresAt: new Date(urlData.TTL * 1000).toISOString(),
+          ...(expiresAt ? { expiresAt } : {}),
         });
       } catch (error: any) {
         if (error.message === 'Invalid URL format') {
@@ -225,8 +259,7 @@ export const handler = async (
       }
     }
 
-    // GET /stats/:shortCode - Get URL statistics
-    if (httpMethod === 'GET' && resource.startsWith('/stats/')) {
+    if (httpMethod === 'GET' && normalizedResource.startsWith('/stats/')) {
       const { shortCode } = pathParameters;
 
       if (!shortCode) {
@@ -249,13 +282,14 @@ export const handler = async (
         lastAccessed: urlData.LastAccessed
           ? new Date(urlData.LastAccessed).toISOString()
           : null,
-        expiresAt: new Date(urlData.TTL * 1000).toISOString(),
+        ...(urlData.TTL
+          ? { expiresAt: new Date(urlData.TTL * 1000).toISOString() }
+          : {}),
         createdBy: urlData.CreatedBy,
       });
     }
 
-    // GET /urls - List all URLs (paginated)
-    if (httpMethod === 'GET' && resource === '/urls') {
+    if (httpMethod === 'GET' && normalizedResource === '/urls') {
       const queryParams = event.queryStringParameters || {};
       const limit = parseInt(queryParams.limit || '20');
       const lastKey = queryParams.lastKey
@@ -273,7 +307,9 @@ export const handler = async (
         lastAccessed: item.LastAccessed
           ? new Date(item.LastAccessed).toISOString()
           : null,
-        expiresAt: new Date(item.TTL * 1000).toISOString(),
+        ...(item.TTL
+          ? { expiresAt: new Date(item.TTL * 1000).toISOString() }
+          : {}),
       }));
 
       return successResponse('URLs retrieved successfully', {
@@ -283,8 +319,7 @@ export const handler = async (
       });
     }
 
-    // DELETE /url/:shortCode - Delete a shortened URL
-    if (httpMethod === 'DELETE' && resource.startsWith('/url/')) {
+    if (httpMethod === 'DELETE' && normalizedResource.startsWith('/url/')) {
       const { shortCode } = pathParameters;
 
       if (!shortCode) {
@@ -305,8 +340,9 @@ export const handler = async (
       });
     }
 
-    // If no route matched
-    return notFoundResponse(`Endpoint not found: ${httpMethod} ${resource}`);
+    return notFoundResponse(
+      `Endpoint not found: ${httpMethod} ${normalizedResource || resource}`
+    );
   } catch (error) {
     console.error('Error in URL shortener operation:', error);
     return serverErrorResponse(

@@ -87,7 +87,6 @@ export const handler = async (
       );
     }
 
-    // Validate ticket structure
     const invalidTickets = tickets.filter(
       (ticket) =>
         !ticket.ticketId ||
@@ -107,7 +106,6 @@ export const handler = async (
     const totalTasks = dates.length * tickets.length;
     const createdAt = new Date().toISOString();
 
-    // Create initial job status in DynamoDB
     const jobStatus: JobStatus = {
       jobId,
       total: totalTasks,
@@ -125,7 +123,6 @@ export const handler = async (
       })
     );
 
-    // Fan-out: Send each ticket/date combination to SQS
     const sendPromises = [];
     for (const date of dates) {
       for (const ticket of tickets) {
@@ -143,14 +140,13 @@ export const handler = async (
             new SendMessageCommand({
               QueueUrl: QUEUE_URL,
               MessageBody: JSON.stringify(message),
-              MessageGroupId: jobId, // For FIFO queues (optional)
+              MessageGroupId: jobId,
             })
           )
         );
       }
     }
 
-    // Send all messages to SQS
     await Promise.all(sendPromises);
 
     console.log(
