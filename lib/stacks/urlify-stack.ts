@@ -89,7 +89,7 @@ export class UrlifyStack extends Stack {
         environment: {
           NODE_OPTIONS: '--enable-source-maps',
           URLIFY_TABLE_NAME: urlifyTable.tableName,
-          BASE_URL: `https://${props.baseApiUrl}`,
+          BASE_URL: `https://${props.redirectDomain}`,
         },
       }
     );
