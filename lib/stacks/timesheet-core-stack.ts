@@ -22,15 +22,25 @@ import * as path from 'path';
  * Endpoint: https://api.elevensys.dev/timesheet
  *
  * Architecture:
- * - 3 Lambda Functions (Job Creator, Ticket Worker, Job Status)
- * - SQS Queue for asynchronous ticket processing
- * - DynamoDB Table for job tracking
- * - Dead Letter Queue for failed messages
+ * - 1 Proxy Lambda (handles all Jira API proxy routes)
+ * - 3 Legacy Lambda Functions (Job Creator, Ticket Worker, Job Status) - REDUNDANT, planned for removal
+ * - SQS Queue for asynchronous ticket processing (legacy)
+ * - DynamoDB Table for job tracking (legacy)
+ * - Dead Letter Queue for failed messages (legacy)
  *
  * Prerequisites:
  * - BaseApiStack must be deployed first
  *
- * Endpoints:
+ * Proxy Endpoints (single Lambda):
+ * - GET /timesheet/worklogs?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch user worklogs
+ * - GET /timesheet/project-worklogs?fromDate=x&toDate=y&jiraInstance=jiradc - Fetch project worklogs
+ * - GET /timesheet/project-worklogs/pagination?fromDate=x&toDate=y&jiraInstance=jiradc - Fetch project worklogs pagination
+ * - DELETE /timesheet/project-worklogs/{issueId}/{timesheetId}?jiraInstance=jiradc - Delete timesheet entry
+ * - GET /timesheet/timesheet-view?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch timesheet calendar view
+ * - GET /timesheet/timesheet-dates?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch timesheet dates
+ * - POST /timesheet/logwork?jiraInstance=jiradc - Log work entry to Jira
+ *
+ * Legacy Endpoints (REDUNDANT - planned for removal):
  * - POST /timesheet/jobs - Create a new job
  * - GET /timesheet/jobs/status?jobId=xxx - Get job status
  */
@@ -39,9 +49,22 @@ export interface TimesheetCoreStackProps extends StackProps {
   baseApiUrl: string; // Base API URL (e.g., 'https://api.elevensys.dev')
 }
 
+/** Shared Lambda defaults for all functions in this stack */
+const LAMBDA_DEFAULTS = {
+  handler: 'handler' as const,
+  runtime: Runtime.NODEJS_20_X,
+  architecture: Architecture.ARM_64,
+  tracing: Tracing.ACTIVE,
+  memorySize: 256,
+};
+
 export class TimesheetCoreStack extends Stack {
   constructor(scope: Construct, id: string, props: TimesheetCoreStackProps) {
     super(scope, id, props);
+
+    // =========================================================================
+    // Legacy Infrastructure (REDUNDANT - planned for removal)
+    // =========================================================================
 
     const jobTable = new dynamodb.Table(this, 'TimesheetJobTable', {
       partitionKey: { name: 'jobId', type: dynamodb.AttributeType.STRING },
@@ -70,19 +93,16 @@ export class TimesheetCoreStack extends Stack {
       this,
       'JobCreatorLambda',
       {
+        ...LAMBDA_DEFAULTS,
         entry: path.join(
           __dirname,
           '../../resources/lambda/job-creator-lambda/index.ts'
         ),
-        handler: 'handler',
-        runtime: Runtime.NODEJS_20_X,
-        architecture: Architecture.ARM_64,
         timeout: Duration.seconds(30),
         memorySize: 512,
         logGroup: new logs.LogGroup(this, 'JobCreatorLambdaLogGroup', {
           retention: logs.RetentionDays.ONE_MONTH,
         }),
-        tracing: Tracing.ACTIVE,
         environment: {
           NODE_OPTIONS: '--enable-source-maps',
           QUEUE_URL: ticketQueue.queueUrl,
@@ -95,19 +115,15 @@ export class TimesheetCoreStack extends Stack {
       this,
       'TicketWorkerLambda',
       {
+        ...LAMBDA_DEFAULTS,
         entry: path.join(
           __dirname,
           '../../resources/lambda/ticket-worker-lambda/index.ts'
         ),
-        handler: 'handler',
-        runtime: Runtime.NODEJS_20_X,
-        architecture: Architecture.ARM_64,
         timeout: Duration.minutes(10),
-        memorySize: 256,
         logGroup: new logs.LogGroup(this, 'TicketWorkerLambdaLogGroup', {
           retention: logs.RetentionDays.ONE_MONTH,
         }),
-        tracing: Tracing.ACTIVE,
         environment: {
           NODE_OPTIONS: '--enable-source-maps',
           TABLE_NAME: jobTable.tableName,
@@ -116,24 +132,19 @@ export class TimesheetCoreStack extends Stack {
     );
 
     const jobStatusLambda = new lambda.NodejsFunction(this, 'JobStatusLambda', {
+      ...LAMBDA_DEFAULTS,
       entry: path.join(
         __dirname,
         '../../resources/lambda/job-status-lambda/index.ts'
       ),
-      handler: 'handler',
-      runtime: Runtime.NODEJS_20_X,
-      architecture: Architecture.ARM_64,
       timeout: Duration.seconds(15),
-      memorySize: 256,
       logGroup: new logs.LogGroup(this, 'JobStatusLambdaLogGroup', {
         retention: logs.RetentionDays.ONE_MONTH,
       }),
-      tracing: Tracing.ACTIVE,
       environment: {
         NODE_OPTIONS: '--enable-source-maps',
         TABLE_NAME: jobTable.tableName,
       },
-      // reservedConcurrentExecutions: 5, // Limit concurrent executions to prevent 429 errors
     });
 
     ticketQueue.grantSendMessages(jobCreatorLambda);
@@ -149,19 +160,87 @@ export class TimesheetCoreStack extends Stack {
       })
     );
 
+    // =========================================================================
+    // Timesheet Proxy Lambda (single Lambda for all Jira API routes)
+    // =========================================================================
+
+    const timesheetProxyLambda = new lambda.NodejsFunction(
+      this,
+      'TimesheetProxyLambda',
+      {
+        ...LAMBDA_DEFAULTS,
+        entry: path.join(
+          __dirname,
+          '../../resources/lambda/timesheet-proxy-lambda/index.ts'
+        ),
+        timeout: Duration.seconds(30),
+        logGroup: new logs.LogGroup(this, 'TimesheetProxyLambdaLogGroup', {
+          retention: logs.RetentionDays.ONE_MONTH,
+        }),
+        environment: {
+          NODE_OPTIONS: '--enable-source-maps',
+        },
+      }
+    );
+
+    const proxyIntegration = new apigateway.LambdaIntegration(
+      timesheetProxyLambda
+    );
+
+    // =========================================================================
+    // API Gateway Routes
+    // =========================================================================
+
     const timesheetResource = props.api.root.addResource('timesheet');
 
+    // --- Legacy routes (REDUNDANT) ---
     const jobsResource = timesheetResource.addResource('jobs');
-    const jobCreatorIntegration = new apigateway.LambdaIntegration(
-      jobCreatorLambda
+    jobsResource.addMethod(
+      'POST',
+      new apigateway.LambdaIntegration(jobCreatorLambda)
     );
-    jobsResource.addMethod('POST', jobCreatorIntegration);
+    jobsResource
+      .addResource('status')
+      .addMethod('GET', new apigateway.LambdaIntegration(jobStatusLambda));
 
-    const jobStatusResource = jobsResource.addResource('status');
-    const jobStatusIntegration = new apigateway.LambdaIntegration(
-      jobStatusLambda
-    );
-    jobStatusResource.addMethod('GET', jobStatusIntegration);
+    // --- Proxy routes (all point to single TimesheetProxyLambda) ---
+    // GET /timesheet/worklogs
+    timesheetResource
+      .addResource('worklogs')
+      .addMethod('GET', proxyIntegration);
+
+    // GET /timesheet/project-worklogs
+    // GET /timesheet/project-worklogs/pagination
+    // DELETE /timesheet/project-worklogs/{issueId}/{timesheetId}
+    const projectWorklogsResource =
+      timesheetResource.addResource('project-worklogs');
+    projectWorklogsResource.addMethod('GET', proxyIntegration);
+    projectWorklogsResource
+      .addResource('pagination')
+      .addMethod('GET', proxyIntegration);
+    const issueIdResource = projectWorklogsResource.addResource('{issueId}');
+    issueIdResource
+      .addResource('{timesheetId}')
+      .addMethod('DELETE', proxyIntegration);
+
+    // GET /timesheet/timesheet-view
+    timesheetResource
+      .addResource('timesheet-view')
+      .addMethod('GET', proxyIntegration);
+
+    // GET /timesheet/timesheet-dates
+    timesheetResource
+      .addResource('timesheet-dates')
+      .addMethod('GET', proxyIntegration);
+
+    // POST /timesheet/logwork
+    timesheetResource
+      .addResource('logwork')
+      .addMethod('POST', proxyIntegration);
+
+    // =========================================================================
+    // Outputs
+    // =========================================================================
 
     new CfnOutput(this, 'TimesheetApiUrlOutput', {
       value: `${props.baseApiUrl}/timesheet`,
@@ -170,12 +249,12 @@ export class TimesheetCoreStack extends Stack {
 
     new CfnOutput(this, 'JobTableNameOutput', {
       value: jobTable.tableName,
-      description: 'DynamoDB table name for job tracking',
+      description: 'DynamoDB table name for job tracking (legacy)',
     });
 
     new CfnOutput(this, 'TicketQueueUrlOutput', {
       value: ticketQueue.queueUrl,
-      description: 'SQS queue URL for ticket processing',
+      description: 'SQS queue URL for ticket processing (legacy)',
     });
   }
 }

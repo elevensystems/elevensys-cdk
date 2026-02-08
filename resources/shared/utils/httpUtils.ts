@@ -72,7 +72,7 @@ export function createJiraHeaders(
     'content-type': 'application/json',
     origin: 'https://insight.fsoft.com.vn',
     priority: 'u=0, i',
-    referer: `https://insight.fsoft.com.vn/${jiraSystem}/browse/EONHOMEGRIDX-25`,
+    referer: `https://insight.fsoft.com.vn/${jiraSystem}/`,
     'sec-ch-ua':
       '"Not(A:Brand";v="99", "Google Chrome";v="133", "Chromium";v="133"',
     'sec-ch-ua-mobile': '?0',
