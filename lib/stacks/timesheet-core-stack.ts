@@ -40,6 +40,8 @@ import * as path from 'path';
  * - GET /timesheet/timesheet-dates?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch timesheet dates
  * - POST /timesheet/logwork?jiraInstance=jiradc - Log work entry to Jira
  * - POST /timesheet/project-worklogs-warning?jiraInstance=jiradc - Get project worklogs warning report
+ * - GET /timesheet/projects?jiraInstance=jiradc - Fetch all Jira projects
+ * - GET /timesheet/projects/{projectId}?jiraInstance=jiradc - Fetch a specific Jira project by ID
  *
  * Legacy Endpoints (REDUNDANT - planned for removal):
  * - POST /timesheet/jobs - Create a new job
@@ -243,6 +245,14 @@ export class TimesheetCoreStack extends Stack {
     timesheetResource
       .addResource('project-worklogs-warning')
       .addMethod('POST', proxyIntegration);
+
+    // GET /timesheet/projects
+    // GET /timesheet/projects/{projectId}
+    const projectsResource = timesheetResource.addResource('projects');
+    projectsResource.addMethod('GET', proxyIntegration);
+    projectsResource
+      .addResource('{projectId}')
+      .addMethod('GET', proxyIntegration);
 
     // =========================================================================
     // Outputs

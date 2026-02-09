@@ -152,6 +152,22 @@ const ROUTES: Record<string, RouteConfig> = {
     buildUrl: (ji) =>
       `${JIRA_BASE}/${ji}/rest/hunger/1.0/project-my-worklogs-report/get-warning`,
   },
+
+  'GET /timesheet/projects': {
+    method: 'GET',
+    tempoPath: 'project',
+    buildUrl: (ji) => `${JIRA_BASE}/${ji}/rest/api/2/project`,
+  },
+
+  'GET /timesheet/projects/{projectId}': {
+    method: 'GET',
+    tempoPath: 'project/{projectId}',
+    requiredPathParams: ['projectId'],
+    buildUrl: (ji, event) => {
+      const { projectId } = event.pathParameters!;
+      return `${JIRA_BASE}/${ji}/rest/api/2/project/${projectId}`;
+    },
+  },
 };
 
 function resolveRoute(event: APIGatewayProxyEvent): RouteConfig | undefined {
