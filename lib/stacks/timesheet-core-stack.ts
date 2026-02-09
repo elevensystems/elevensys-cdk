@@ -39,6 +39,7 @@ import * as path from 'path';
  * - GET /timesheet/timesheet-view?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch timesheet calendar view
  * - GET /timesheet/timesheet-dates?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch timesheet dates
  * - POST /timesheet/logwork?jiraInstance=jiradc - Log work entry to Jira
+ * - POST /timesheet/project-worklogs-warning?jiraInstance=jiradc - Get project worklogs warning report
  *
  * Legacy Endpoints (REDUNDANT - planned for removal):
  * - POST /timesheet/jobs - Create a new job
@@ -236,6 +237,11 @@ export class TimesheetCoreStack extends Stack {
     // POST /timesheet/logwork
     timesheetResource
       .addResource('logwork')
+      .addMethod('POST', proxyIntegration);
+
+    // POST /timesheet/project-worklogs-warning
+    timesheetResource
+      .addResource('project-worklogs-warning')
       .addMethod('POST', proxyIntegration);
 
     // =========================================================================

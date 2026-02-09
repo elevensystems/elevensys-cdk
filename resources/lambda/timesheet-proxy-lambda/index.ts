@@ -1,6 +1,9 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import axios, { Method } from 'axios';
-import { createJiraHeaders, parseBodyToJson } from '../../shared/utils/httpUtils';
+import {
+  createJiraHeaders,
+  parseBodyToJson,
+} from '../../shared/utils/httpUtils';
 import { JiraInstance } from '../../shared/models/types';
 
 const CORS_HEADERS = {
@@ -18,10 +21,7 @@ interface RouteConfig {
   requiredQueryParams?: string[];
   requiredPathParams?: string[];
   requiredBodyFields?: string[];
-  buildUrl: (
-    jiraInstance: JiraInstance,
-    event: APIGatewayProxyEvent
-  ) => string;
+  buildUrl: (jiraInstance: JiraInstance, event: APIGatewayProxyEvent) => string;
 }
 
 function forwardQueryParams(
@@ -144,6 +144,14 @@ const ROUTES: Record<string, RouteConfig> = {
     buildUrl: (ji) =>
       `${JIRA_BASE}/${ji}/rest/tempo/1.0/log-work/create-log-work`,
   },
+
+  'POST /timesheet/project-worklogs-warning': {
+    method: 'POST',
+    tempoPath: 'project-my-worklogs-report/get-warning',
+    requiredBodyFields: ['pid', 'startDate', 'endDate'],
+    buildUrl: (ji) =>
+      `${JIRA_BASE}/${ji}/rest/hunger/1.0/project-my-worklogs-report/get-warning`,
+  },
 };
 
 function resolveRoute(event: APIGatewayProxyEvent): RouteConfig | undefined {
@@ -181,7 +189,10 @@ export const handler = async (
     // 2. Route resolution
     const route = resolveRoute(event);
     if (!route) {
-      return errorResponse(404, `Unknown route: ${event.httpMethod} ${event.resource}`);
+      return errorResponse(
+        404,
+        `Unknown route: ${event.httpMethod} ${event.resource}`
+      );
     }
 
     // 3. Validate required query params
@@ -215,9 +226,7 @@ export const handler = async (
       if (!body) {
         return errorResponse(400, 'Missing or invalid request body');
       }
-      const missing = route.requiredBodyFields.filter(
-        (f) => !body[f]
-      );
+      const missing = route.requiredBodyFields.filter((f) => !body[f]);
       if (missing.length > 0) {
         return errorResponse(
           400,
