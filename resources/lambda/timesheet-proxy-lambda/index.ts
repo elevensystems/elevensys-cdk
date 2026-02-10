@@ -22,6 +22,10 @@ interface RouteConfig {
   requiredPathParams?: string[];
   requiredBodyFields?: string[];
   buildUrl: (jiraInstance: JiraInstance, event: APIGatewayProxyEvent) => string;
+  /** Build the upstream request body (used when gateway GET proxies to Jira POST) */
+  buildBody?: (event: APIGatewayProxyEvent) => any;
+  /** Override Content-Type for the upstream request (e.g. 'application/x-www-form-urlencoded') */
+  contentType?: string;
 }
 
 function forwardQueryParams(
@@ -168,6 +172,27 @@ const ROUTES: Record<string, RouteConfig> = {
       return `${JIRA_BASE}/${ji}/rest/api/2/project/${projectId}`;
     },
   },
+
+  'GET /timesheet/projects/{projectId}/issues': {
+    method: 'POST',
+    tempoPath: 'issueNav/1/issueTable',
+    requiredPathParams: ['projectId'],
+    contentType: 'application/x-www-form-urlencoded',
+    buildUrl: (ji) => `${JIRA_BASE}/${ji}/rest/issueNav/1/issueTable`,
+    buildBody: (event) => {
+      const { projectId } = event.pathParameters!;
+      const params = event.queryStringParameters || {};
+      const startIndex = params.startIndex || '0';
+      const jql = `project = "${projectId}" ORDER BY created DESC`;
+      const searchParams = new URLSearchParams({
+        jql,
+        columnConfig: 'explicit',
+        layoutKey: 'split-view',
+        startIndex,
+      });
+      return searchParams.toString();
+    },
+  },
 };
 
 function resolveRoute(event: APIGatewayProxyEvent): RouteConfig | undefined {
@@ -261,8 +286,16 @@ export const handler = async (
 
     let response;
     if (route.method === 'POST') {
-      body = body || parseBodyToJson(event.body);
-      response = await axios.post(url, body, { headers, timeout: 15000 });
+      body = route.buildBody
+        ? route.buildBody(event)
+        : body || parseBodyToJson(event.body);
+      const requestHeaders = route.contentType
+        ? { ...headers, 'Content-Type': route.contentType }
+        : headers;
+      response = await axios.post(url, body, {
+        headers: requestHeaders,
+        timeout: 15000,
+      });
     } else if (route.method === 'DELETE') {
       response = await axios.delete(url, { headers, timeout: 15000 });
     } else {
