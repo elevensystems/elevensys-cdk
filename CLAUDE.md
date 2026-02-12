@@ -59,7 +59,7 @@ elevensys-cdk/
 │           ├── dateUtils.ts     # getCurrentTime, parseDates
 │           └── dynamodbUtils.ts # Ticket CRUD operations
 ├── test/                        # Jest unit tests
-├── docs/                        # Documentation (placeholder)
+├── docs/                        # Documentation (API.md - full API reference)
 ├── scripts/                     # Scripts (placeholder)
 └── .github/workflows/           # CI/CD (deploy.yml)
 ```
@@ -128,6 +128,7 @@ The timesheet stack has two architectures - a newer proxy-based approach and leg
 **Proxy Endpoints:**
 | Method | Path | Description |
 |--------|------|-------------|
+| `GET` | `/timesheet/auth` | Check authentication with Jira |
 | `GET` | `/timesheet/worklogs` | Fetch user worklogs |
 | `GET` | `/timesheet/project-worklogs` | Fetch project worklogs |
 | `GET` | `/timesheet/project-worklogs/pagination` | Paginated project worklogs |
@@ -135,6 +136,11 @@ The timesheet stack has two architectures - a newer proxy-based approach and leg
 | `GET` | `/timesheet/timesheet-view` | Fetch timesheet calendar view |
 | `GET` | `/timesheet/timesheet-dates` | Fetch timesheet dates |
 | `POST` | `/timesheet/logwork` | Log work entry to Jira |
+| `POST` | `/timesheet/project-worklogs-warning` | Project worklogs warning report |
+| `GET` | `/timesheet/projects` | Fetch all Jira projects |
+| `GET` | `/timesheet/projects/{projectId}` | Fetch a specific Jira project |
+| `POST` | `/timesheet/projects` | Fetch issues using JQL payload |
+| `GET` | `/timesheet/projects/{projectId}/issues` | Fetch issues for a project |
 
 All proxy endpoints accept `?jiraInstance=jiradc|jira3|jira9` query parameter.
 
@@ -302,6 +308,7 @@ GitHub Actions workflow (`.github/workflows/deploy.yml`):
 | `resources/shared/utils/responseUtils.ts` | Standardized API responses |
 | `resources/shared/utils/httpUtils.ts` | HTTP client with retry logic + Jira headers |
 | `resources/shared/models/types.ts` | Core TypeScript interfaces |
+| `docs/API.md` | Full API reference with all endpoints |
 
 ## Common Tasks
 
