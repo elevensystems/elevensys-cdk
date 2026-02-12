@@ -42,7 +42,7 @@ import * as path from 'path';
  * - POST /timesheet/project-worklogs-warning?jiraInstance=jiradc - Get project worklogs warning report
  * - GET /timesheet/projects?jiraInstance=jiradc - Fetch all Jira projects
  * - GET /timesheet/projects/{projectId}?jiraInstance=jiradc - Fetch a specific Jira project by ID
- * - GET /timesheet/projects/{projectId}/issues?startIndex=0&jiraInstance=jiradc - Fetch issues for a project
+ * - POST /timesheet/projects - Fetch issues using payload
  *
  * Legacy Endpoints (REDUNDANT - planned for removal):
  * - POST /timesheet/jobs - Create a new job
@@ -208,6 +208,9 @@ export class TimesheetCoreStack extends Stack {
       .addMethod('GET', new apigateway.LambdaIntegration(jobStatusLambda));
 
     // --- Proxy routes (all point to single TimesheetProxyLambda) ---
+    // GET /timesheet/auth
+    timesheetResource.addResource('auth').addMethod('GET', proxyIntegration);
+
     // GET /timesheet/worklogs
     timesheetResource
       .addResource('worklogs')
@@ -251,6 +254,7 @@ export class TimesheetCoreStack extends Stack {
     // GET /timesheet/projects/{projectId}
     const projectsResource = timesheetResource.addResource('projects');
     projectsResource.addMethod('GET', proxyIntegration);
+    projectsResource.addMethod('POST', proxyIntegration);
     const projectIdResource = projectsResource.addResource('{projectId}');
     projectIdResource.addMethod('GET', proxyIntegration);
     projectIdResource.addResource('issues').addMethod('GET', proxyIntegration);

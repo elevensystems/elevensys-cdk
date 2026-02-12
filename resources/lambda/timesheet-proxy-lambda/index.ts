@@ -44,6 +44,13 @@ function forwardQueryParams(
 }
 
 const ROUTES: Record<string, RouteConfig> = {
+  'GET /timesheet/auth': {
+    method: 'GET',
+    tempoPath: 'system/auth',
+    buildUrl: (ji) =>
+      `${JIRA_BASE}/${ji}/rest/softwareplant-bigtemplate/1.0/system/auth`,
+  },
+
   'GET /timesheet/worklogs': {
     method: 'GET',
     tempoPath: 'user-worklogs/get-list',
@@ -173,22 +180,25 @@ const ROUTES: Record<string, RouteConfig> = {
     },
   },
 
-  'GET /timesheet/projects/{projectId}/issues': {
+  'POST /timesheet/projects': {
     method: 'POST',
     tempoPath: 'issueNav/1/issueTable',
-    requiredPathParams: ['projectId'],
+    requiredBodyFields: [
+      'jiraInstance',
+      'jql',
+      'columnConfig',
+      'layoutKey',
+      'startIndex',
+    ],
     contentType: 'application/x-www-form-urlencoded',
     buildUrl: (ji) => `${JIRA_BASE}/${ji}/rest/issueNav/1/issueTable`,
     buildBody: (event) => {
-      const { projectId } = event.pathParameters!;
-      const params = event.queryStringParameters || {};
-      const startIndex = params.startIndex || '0';
-      const jql = `project = "${projectId}" ORDER BY created DESC`;
+      const body = parseBodyToJson(event.body) || {};
       const searchParams = new URLSearchParams({
-        jql,
-        columnConfig: 'explicit',
-        layoutKey: 'split-view',
-        startIndex,
+        jql: body.jql,
+        columnConfig: body.columnConfig,
+        layoutKey: body.layoutKey,
+        startIndex: body.startIndex,
       });
       return searchParams.toString();
     },
@@ -277,7 +287,8 @@ export const handler = async (
     }
 
     // 6. Build URL and execute request
-    const jiraInstance = (event.queryStringParameters?.jiraInstance ||
+    const jiraInstance = ((body?.jiraInstance as JiraInstance) ||
+      (event.queryStringParameters?.jiraInstance as JiraInstance) ||
       'jiradc') as JiraInstance;
     const url = route.buildUrl(jiraInstance, event);
     const headers = createJiraHeaders(token, jiraInstance);
