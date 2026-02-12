@@ -1,10 +1,12 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-import axios, { Method } from 'axios';
+import axios from 'axios';
 import {
   createJiraHeaders,
   parseBodyToJson,
 } from '../../shared/utils/httpUtils';
 import { JiraInstance } from '../../shared/models/types';
+
+type HttpMethod = 'GET' | 'POST' | 'DELETE' | 'PUT' | 'PATCH';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -16,7 +18,7 @@ const CORS_HEADERS = {
 const JIRA_BASE = 'https://insight.fsoft.com.vn';
 
 interface RouteConfig {
-  method: Method;
+  method: HttpMethod;
   tempoPath: string;
   requiredQueryParams?: string[];
   requiredPathParams?: string[];
@@ -177,6 +179,16 @@ const ROUTES: Record<string, RouteConfig> = {
     buildUrl: (ji, event) => {
       const { projectId } = event.pathParameters!;
       return `${JIRA_BASE}/${ji}/rest/api/2/project/${projectId}`;
+    },
+  },
+
+  'GET /timesheet/issue/{issueId}': {
+    method: 'GET',
+    tempoPath: 'issue/{issueId}',
+    requiredPathParams: ['issueId'],
+    buildUrl: (ji, event) => {
+      const { issueId } = event.pathParameters!;
+      return `${JIRA_BASE}/${ji}/rest/api/2/issue/${issueId}`;
     },
   },
 

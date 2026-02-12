@@ -250,6 +250,12 @@ export class TimesheetCoreStack extends Stack {
       .addResource('project-worklogs-warning')
       .addMethod('POST', proxyIntegration);
 
+    // GET /timesheet/issue/{issueId}
+    timesheetResource
+      .addResource('issue')
+      .addResource('{issueId}')
+      .addMethod('GET', proxyIntegration);
+
     // GET /timesheet/projects
     // GET /timesheet/projects/{projectId}
     const projectsResource = timesheetResource.addResource('projects');
