@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(done)",
+      "Bash(npm run build:*)"
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "sh E:\\code\\elevensys-cdk\\.claude\\statusline-command.sh"
+  }
+}
