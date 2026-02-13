@@ -4,7 +4,11 @@
     "allow": [
       "Bash(ls:*)",
       "Bash(done)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(npx jest:*)",
+      "Bash(npm install:*)",
+      "Bash(npm test:*)",
+      "Bash(npx commitlint:*)"
     ]
   },
   "statusLine": {
