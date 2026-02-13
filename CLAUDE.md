@@ -4,7 +4,7 @@
 
 **elevensys-cdk** is an AWS CDK infrastructure-as-code project written in TypeScript. It deploys a microservices platform with multiple integrated services:
 
-- **Jira Timesheet Integration** - Proxy to Jira/Tempo APIs for worklog management
+- **Jira Timesheet Integration** - Proxy to Jira APIs for worklog management
 - **URL Shortener (Urlify)** - URL shortening with click tracking and custom domain
 - **OpenAI API Wrapper** - Proxied access to OpenAI's API
 
@@ -36,7 +36,7 @@ elevensys-cdk/
 │       └── jira-timesheet-ui-stack.ts # UI static hosting (commented out)
 ├── resources/
 │   ├── lambda/                  # Lambda function implementations
-│   │   ├── timesheet-proxy-lambda/   # Jira/Tempo API proxy
+│   │   ├── timesheet-proxy-lambda/   # Jira API proxy
 │   │   ├── openai-lambda/            # OpenAI API proxy
 │   │   ├── urlify-lambda/            # URL redirect handler
 │   │   └── urlify-admin-lambda/      # URL management API
@@ -112,8 +112,8 @@ npx cdk destroy            # Destroy stacks
 
 ### TimesheetCoreStack
 
-- Single `timesheet-proxy-lambda` handles all Jira/Tempo API routes
-- Routes requests to Jira's Tempo REST API based on HTTP method and path
+- Single `timesheet-proxy-lambda` handles all Jira API routes
+- Routes requests to Jira REST API based on HTTP method and path
 - Requires `Authorization` header (Bearer token) forwarded to Jira
 
 **Proxy Endpoints:**
@@ -275,7 +275,7 @@ GitHub Actions workflow (`.github/workflows/deploy.yml`):
 ## Key Design Patterns
 
 1. **Microservices Architecture** - Independent stacks sharing base API
-2. **API Proxy** - Single Lambda routing to external Jira/Tempo APIs
+2. **API Proxy** - Single Lambda routing to external Jira APIs
 3. **Exponential Backoff** - Retry logic with jitter for external API calls
 
 ## Important Files to Understand

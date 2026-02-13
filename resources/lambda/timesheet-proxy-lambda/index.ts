@@ -19,7 +19,7 @@ const JIRA_BASE = 'https://insight.fsoft.com.vn';
 
 interface RouteConfig {
   method: HttpMethod;
-  tempoPath: string;
+  path: string;
   requiredQueryParams?: string[];
   requiredPathParams?: string[];
   requiredBodyFields?: string[];
@@ -48,14 +48,14 @@ function forwardQueryParams(
 const ROUTES: Record<string, RouteConfig> = {
   'GET /timesheet/auth': {
     method: 'GET',
-    tempoPath: 'system/auth',
+    path: 'system/auth',
     buildUrl: (ji) =>
       `${JIRA_BASE}/${ji}/rest/softwareplant-bigtemplate/1.0/system/auth`,
   },
 
   'GET /timesheet/worklogs': {
     method: 'GET',
-    tempoPath: 'user-worklogs/get-list',
+    path: 'user-worklogs/get-list',
     requiredQueryParams: ['fromDate', 'toDate', 'user'],
     buildUrl: (ji, event) => {
       const params = event.queryStringParameters!;
@@ -72,7 +72,7 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'GET /timesheet/project-worklogs': {
     method: 'GET',
-    tempoPath: 'project-worklogs/get-list',
+    path: 'project-worklogs/get-list',
     requiredQueryParams: ['fromDate', 'toDate'],
     buildUrl: (ji, event) =>
       forwardQueryParams(
@@ -83,7 +83,7 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'GET /timesheet/project-worklogs/pagination': {
     method: 'GET',
-    tempoPath: 'project-worklogs/get-page-list',
+    path: 'project-worklogs/get-page-list',
     requiredQueryParams: ['fromDate', 'toDate'],
     buildUrl: (ji, event) =>
       forwardQueryParams(
@@ -94,7 +94,7 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'DELETE /timesheet/project-worklogs/{issueId}/{timesheetId}': {
     method: 'DELETE',
-    tempoPath: 'project-worklogs',
+    path: 'project-worklogs',
     requiredPathParams: ['issueId', 'timesheetId'],
     buildUrl: (ji, event) => {
       const { issueId, timesheetId } = event.pathParameters!;
@@ -104,7 +104,7 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'GET /timesheet/timesheet-view': {
     method: 'GET',
-    tempoPath: 'user-worklogs/search-by-user',
+    path: 'user-worklogs/search-by-user',
     requiredQueryParams: ['fromDate', 'toDate', 'user'],
     buildUrl: (ji, event) => {
       const params = event.queryStringParameters!;
@@ -128,7 +128,7 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'GET /timesheet/timesheet-dates': {
     method: 'GET',
-    tempoPath: 'user-worklogs/get-list-date',
+    path: 'user-worklogs/get-list-date',
     requiredQueryParams: ['fromDate', 'toDate', 'user'],
     buildUrl: (ji, event) => {
       const params = event.queryStringParameters!;
@@ -152,7 +152,7 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'POST /timesheet/logwork': {
     method: 'POST',
-    tempoPath: 'log-work/create-log-work',
+    path: 'log-work/create-log-work',
     requiredBodyFields: ['issueKey', 'username', 'startDate'],
     buildUrl: (ji) =>
       `${JIRA_BASE}/${ji}/rest/tempo/1.0/log-work/create-log-work`,
@@ -160,7 +160,7 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'POST /timesheet/project-worklogs-warning': {
     method: 'POST',
-    tempoPath: 'project-my-worklogs-report/get-warning',
+    path: 'project-my-worklogs-report/get-warning',
     requiredBodyFields: ['pid', 'startDate', 'endDate'],
     buildUrl: (ji) =>
       `${JIRA_BASE}/${ji}/rest/hunger/1.0/project-my-worklogs-report/get-warning`,
@@ -168,13 +168,13 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'GET /timesheet/projects': {
     method: 'GET',
-    tempoPath: 'project',
+    path: 'project',
     buildUrl: (ji) => `${JIRA_BASE}/${ji}/rest/api/2/project`,
   },
 
   'GET /timesheet/projects/{projectId}': {
     method: 'GET',
-    tempoPath: 'project/{projectId}',
+    path: 'project/{projectId}',
     requiredPathParams: ['projectId'],
     buildUrl: (ji, event) => {
       const { projectId } = event.pathParameters!;
@@ -184,7 +184,7 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'GET /timesheet/issue/{issueId}': {
     method: 'GET',
-    tempoPath: 'issue/{issueId}',
+    path: 'issue/{issueId}',
     requiredPathParams: ['issueId'],
     buildUrl: (ji, event) => {
       const { issueId } = event.pathParameters!;
@@ -194,7 +194,7 @@ const ROUTES: Record<string, RouteConfig> = {
 
   'POST /timesheet/projects': {
     method: 'POST',
-    tempoPath: 'issueNav/1/issueTable',
+    path: 'issueNav/1/issueTable',
     requiredBodyFields: [
       'jiraInstance',
       'jql',
