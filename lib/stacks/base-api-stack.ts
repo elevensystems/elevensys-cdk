@@ -56,8 +56,8 @@ export class BaseApiStack extends Stack {
     );
 
     this.api = new apigateway.RestApi(this, 'BaseApi', {
-      restApiName: 'ElevenSys Base API',
-      description: 'Centralized API Gateway for all ElevenSys services',
+      restApiName: 'Eleven Systems Base API',
+      description: 'Centralized API Gateway for all Eleven Systems services',
       domainName: {
         domainName: props.domainName,
         certificate: certificate,
@@ -69,7 +69,7 @@ export class BaseApiStack extends Stack {
         metricsEnabled: false,
         dataTraceEnabled: false,
         loggingLevel: apigateway.MethodLoggingLevel.OFF,
-        tracingEnabled: true,
+        tracingEnabled: false,
       },
       defaultCorsPreflightOptions: {
         allowOrigins: apigateway.Cors.ALL_ORIGINS,
@@ -83,7 +83,7 @@ export class BaseApiStack extends Stack {
         ],
         maxAge: Duration.days(1),
       },
-      cloudWatchRole: true,
+      cloudWatchRole: false,
     });
 
     const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
