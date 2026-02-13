@@ -4,7 +4,7 @@
 
 **elevensys-cdk** is an AWS CDK infrastructure-as-code project written in TypeScript. It deploys a microservices platform with multiple integrated services:
 
-- **Jira Timesheet Integration** - Proxy to Jira/Tempo APIs for worklog management, plus legacy async job processing
+- **Jira Timesheet Integration** - Proxy to Jira/Tempo APIs for worklog management
 - **URL Shortener (Urlify)** - URL shortening with click tracking and custom domain
 - **OpenAI API Wrapper** - Proxied access to OpenAI's API
 
@@ -18,7 +18,7 @@ All services share a common API Gateway at `api.elevensys.dev`.
 - **AWS SDK v3** - DynamoDB, SQS, SSM clients (`^3.868.0`)
 - **axios ^1.11.0** - HTTP client for Jira API proxy
 - **openai ^6.16.0** - OpenAI SDK
-- **uuid ^11.0.3** - UUIDv7 generation for job IDs
+- **uuid ^11.0.3** - UUID generation
 - **Jest 29.7.0** - Testing framework
 
 ## Directory Structure
@@ -36,19 +36,14 @@ elevensys-cdk/
 │       └── jira-timesheet-ui-stack.ts # UI static hosting (commented out)
 ├── resources/
 │   ├── lambda/                  # Lambda function implementations
-│   │   ├── timesheet-proxy-lambda/   # Jira/Tempo API proxy (primary)
-│   │   ├── project-worklogs-lambda/  # Project worklogs standalone
-│   │   ├── timesheet-dates-lambda/   # Timesheet dates standalone
-│   │   ├── job-creator-lambda/       # Creates timesheet jobs (legacy)
-│   │   ├── ticket-worker-lambda/     # Processes individual tickets (legacy)
-│   │   ├── job-status-lambda/        # Returns job progress (legacy)
+│   │   ├── timesheet-proxy-lambda/   # Jira/Tempo API proxy
 │   │   ├── openai-lambda/            # OpenAI API proxy
 │   │   ├── urlify-lambda/            # URL redirect handler
 │   │   └── urlify-admin-lambda/      # URL management API
 │   └── shared/                  # Shared code across lambdas
 │       ├── constants/           # Shared constants
 │       ├── models/              # TypeScript interfaces
-│       │   ├── types.ts         # Core types (Ticket, JiraInstance, JobStatus, etc.)
+│       │   ├── types.ts         # Core types (JiraInstance)
 │       │   └── urlShortenerTypes.ts # UrlData interface
 │       ├── services/            # AWS service wrappers
 │       │   ├── dynamoDbClient.ts # DynamoDBService class
@@ -56,8 +51,7 @@ elevensys-cdk/
 │       └── utils/               # Helper functions
 │           ├── responseUtils.ts # Standardized API responses
 │           ├── httpUtils.ts     # HTTP client with retry, Jira headers, parseBodyToJson
-│           ├── dateUtils.ts     # getCurrentTime, parseDates
-│           └── dynamodbUtils.ts # Ticket CRUD operations
+│           └── dateUtils.ts     # getCurrentTime, parseDates
 ├── test/                        # Jest unit tests
 ├── docs/                        # Documentation (API.md - full API reference)
 ├── scripts/                     # Scripts (placeholder)
@@ -118,9 +112,6 @@ npx cdk destroy            # Destroy stacks
 
 ### TimesheetCoreStack
 
-The timesheet stack has two architectures - a newer proxy-based approach and legacy async processing:
-
-**Proxy Architecture (primary):**
 - Single `timesheet-proxy-lambda` handles all Jira/Tempo API routes
 - Routes requests to Jira's Tempo REST API based on HTTP method and path
 - Requires `Authorization` header (Bearer token) forwarded to Jira
@@ -141,16 +132,9 @@ The timesheet stack has two architectures - a newer proxy-based approach and leg
 | `GET` | `/timesheet/projects/{projectId}` | Fetch a specific Jira project |
 | `POST` | `/timesheet/projects` | Fetch issues using JQL payload |
 | `GET` | `/timesheet/projects/{projectId}/issues` | Fetch issues for a project |
+| `GET` | `/timesheet/issue/{issueId}` | Fetch a specific Jira issue |
 
 All proxy endpoints accept `?jiraInstance=jiradc|jira3|jira9` query parameter.
-
-**Legacy Endpoints (planned for removal):**
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/timesheet/jobs` | Create a new bulk job |
-| `GET` | `/timesheet/jobs/status?jobId=xxx` | Get job status |
-
-Legacy architecture: Job Creator -> SQS Queue -> Ticket Workers -> DynamoDB (with TTL).
 
 ### UrlifyStack
 
@@ -218,8 +202,8 @@ const body = parseBodyToJson<MyType>(event.body);
 
 - **Runtime:** Node.js 20.x (NODEJS_LATEST)
 - **Architecture:** ARM64 (cost optimized)
-- **Memory:** 256MB default (512MB for job creator)
-- **Timeout:** 30s for proxy/creator, 15s for status, 10min for ticket worker
+- **Memory:** 256MB default
+- **Timeout:** 30s for proxy
 - **Tracing:** X-Ray active
 - **Log Retention:** 1 month
 
@@ -292,10 +276,7 @@ GitHub Actions workflow (`.github/workflows/deploy.yml`):
 
 1. **Microservices Architecture** - Independent stacks sharing base API
 2. **API Proxy** - Single Lambda routing to external Jira/Tempo APIs
-3. **Async Processing** - SQS fan-out for scalable job processing (legacy)
-4. **Exponential Backoff** - Retry logic with jitter for external API calls
-5. **TTL Management** - Auto-expiring records in DynamoDB
-6. **Error Tracking** - Centralized error storage per job
+3. **Exponential Backoff** - Retry logic with jitter for external API calls
 
 ## Important Files to Understand
 
@@ -303,7 +284,7 @@ GitHub Actions workflow (`.github/workflows/deploy.yml`):
 |------|---------|
 | `bin/elevensys-cdk.ts` | Stack instantiation and dependencies |
 | `lib/stacks/base-api-stack.ts` | Shared API Gateway configuration |
-| `lib/stacks/timesheet-core-stack.ts` | Timesheet proxy + legacy architecture |
+| `lib/stacks/timesheet-core-stack.ts` | Timesheet proxy architecture |
 | `resources/lambda/timesheet-proxy-lambda/index.ts` | Route-based Jira API proxy |
 | `resources/shared/utils/responseUtils.ts` | Standardized API responses |
 | `resources/shared/utils/httpUtils.ts` | HTTP client with retry logic + Jira headers |

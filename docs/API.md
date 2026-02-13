@@ -31,15 +31,6 @@ All endpoints accept optional query parameter `?jiraInstance=jiradc|jira3|jira9`
 
 ---
 
-## Timesheet Legacy (planned for removal)
-
-| Method | Path                     | Parameters                 | Handler              | Description                     |
-| ------ | ------------------------ | -------------------------- | -------------------- | ------------------------------- |
-| `POST` | `/timesheet/jobs`        | Body: job creation payload | `job-creator-lambda` | Create a new bulk timesheet job |
-| `GET`  | `/timesheet/jobs/status` | `jobId` (required)         | `job-status-lambda`  | Get job processing status       |
-
----
-
 ## OpenAI
 
 **Stack:** OpenAIStack
@@ -82,8 +73,7 @@ All endpoints accept optional query parameter `?jiraInstance=jiradc|jira3|jira9`
 | Service          | Active Endpoints |
 | ---------------- | ---------------- |
 | Timesheet Proxy  | 14               |
-| Timesheet Legacy | 2                |
 | OpenAI           | 1                |
 | Urlify Admin     | 5                |
 | Urlify Redirect  | 1                |
-| **Total**        | **23**           |
+| **Total**        | **21**           |
