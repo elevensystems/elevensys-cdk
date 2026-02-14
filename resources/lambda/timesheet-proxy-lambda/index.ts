@@ -4,16 +4,10 @@ import {
   createJiraHeaders,
   parseBodyToJson,
 } from '../../shared/utils/httpUtils';
+import { withCors } from '../../shared/utils/corsUtils';
 import { JiraInstance } from '../../shared/models/types';
 
 type HttpMethod = 'GET' | 'POST' | 'DELETE' | 'PUT' | 'PATCH';
-
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Content-Type': 'application/json',
-};
 
 const JIRA_BASE = 'https://insight.fsoft.com.vn';
 
@@ -228,18 +222,14 @@ function errorResponse(
 ): APIGatewayProxyResult {
   return {
     statusCode,
-    headers: CORS_HEADERS,
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ error }),
   };
 }
 
-export const handler = async (
+export const handler = withCors(async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers: CORS_HEADERS, body: '' };
-  }
-
   try {
     // 1. Auth extraction
     const authHeader =
@@ -329,7 +319,7 @@ export const handler = async (
 
     return {
       statusCode: 200,
-      headers: CORS_HEADERS,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ success: true, data: response.data }),
     };
   } catch (error: any) {
@@ -341,7 +331,7 @@ export const handler = async (
 
     return {
       statusCode,
-      headers: CORS_HEADERS,
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         error:
           typeof errorMessage === 'string'
@@ -351,4 +341,4 @@ export const handler = async (
       }),
     };
   }
-};
+});

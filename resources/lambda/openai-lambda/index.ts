@@ -1,5 +1,6 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import OpenAI from 'openai';
+import { withCors } from '../../shared/utils/corsUtils';
 
 const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -20,25 +21,14 @@ const client = new OpenAI({
  *   "tools": []  // Optional, e.g., [{ "type": "web_search" }]
  * }
  */
-export const handler = async (
+export const handler = withCors(async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
   console.log('Received event:', JSON.stringify(event, null, 2));
 
   const headers = {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
-
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers,
-      body: '',
-    };
-  }
 
   try {
     if (!event.body) {
@@ -114,4 +104,4 @@ export const handler = async (
       }),
     };
   }
-};
+});

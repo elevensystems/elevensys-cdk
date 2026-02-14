@@ -72,7 +72,7 @@ export class BaseApiStack extends Stack {
         tracingEnabled: false,
       },
       defaultCorsPreflightOptions: {
-        allowOrigins: apigateway.Cors.ALL_ORIGINS,
+        allowOrigins: ['https://satio.dev', 'https://elevensystems.dev'],
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: [
           'Content-Type',

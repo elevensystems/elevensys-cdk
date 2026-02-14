@@ -15,6 +15,7 @@ import {
   serverErrorResponse,
 } from '../../shared/utils/responseUtils';
 import { parseBodyToJson } from '../../shared/utils/httpUtils';
+import { withCors } from '../../shared/utils/corsUtils';
 import { UrlData } from '../../shared/models/urlShortenerTypes';
 
 import { randomBytes } from 'crypto';
@@ -177,7 +178,7 @@ async function deleteUrl(shortCode: string): Promise<boolean> {
  * @param event API Gateway event
  * @returns API Gateway response
  */
-export const handler = async (
+export const handler = withCors(async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
   console.log('Event:', JSON.stringify(event, null, 2));
@@ -350,4 +351,4 @@ export const handler = async (
       [{ detail: error instanceof Error ? error.message : 'Unknown error' }]
     );
   }
-};
+});
