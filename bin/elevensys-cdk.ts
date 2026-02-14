@@ -2,7 +2,6 @@
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
-// import { JiraTimesheetUiStack } from '../lib/stacks/jira-timesheet-ui-stack';
 import { BaseApiStack } from '../lib/stacks/base-api-stack';
 import { UrlifyStack } from '../lib/stacks/urlify-stack';
 import { TimesheetCoreStack } from '../lib/stacks/timesheet-core-stack';

@@ -32,8 +32,7 @@ elevensys-cdk/
 │       ├── base-api-stack.ts    # Shared API Gateway (api.elevensys.dev)
 │       ├── openai-stack.ts      # OpenAI API integration
 │       ├── timesheet-core-stack.ts # Jira timesheet proxy + legacy processing
-│       ├── urlify-stack.ts      # URL shortener service
-│       └── jira-timesheet-ui-stack.ts # UI static hosting (commented out)
+│       └── urlify-stack.ts      # URL shortener service
 ├── resources/
 │   ├── lambda/                  # Lambda function implementations
 │   │   ├── timesheet-proxy-lambda/   # Jira API proxy

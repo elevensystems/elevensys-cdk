@@ -4,22 +4,6 @@ This is a CDK development project with TypeScript for deploying the Jira Timeshe
 
 The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
-## Custom Domain Setup
-
-To use a custom domain with CloudFront:
-
-1. Create a `.env` file based on `.env.example`
-2. Set your `DOMAIN_NAME`, `HOSTED_ZONE_ID`, and `HOSTED_ZONE_NAME` in the `.env` file
-3. Provide your existing AWS Certificate Manager certificate ARN in the `CERTIFICATE_ARN` variable
-   - Note: The certificate must exist in the us-east-1 region for CloudFront to use it
-4. The domain must already exist in Route 53 as a hosted zone
-5. Deploy the stack with `npx cdk deploy JiraTimesheetUiStack`
-
-The stack will:
-
-- Configure CloudFront to use your domain with your existing certificate
-- Create a Route 53 A record pointing to the CloudFront distribution
-
 ## Useful commands
 
 - `npm run build` compile typescript to js
