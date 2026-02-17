@@ -161,7 +161,7 @@ async function deleteUrl(shortCode: string): Promise<boolean> {
           PK: `URL#${shortCode}`,
           SK: 'METADATA',
         }),
-        ConditionExpression: 'attribute_not_exists(PK)',
+        ConditionExpression: 'attribute_exists(PK)',
       })
     );
     return true;
@@ -178,177 +178,177 @@ async function deleteUrl(shortCode: string): Promise<boolean> {
  * @param event API Gateway event
  * @returns API Gateway response
  */
-export const handler = withCors(async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
-  console.log('Event:', JSON.stringify(event, null, 2));
+export const handler = withCors(
+  async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    console.log('Event:', JSON.stringify(event, null, 2));
 
-  try {
-    const httpMethod = event.httpMethod;
-    const resource = event.resource || '';
-    const pathParameters = event.pathParameters || {};
-    const normalizedResource = resource.replace(/^\/urlify/, '');
+    try {
+      const httpMethod = event.httpMethod;
+      const resource = event.resource || '';
+      const pathParameters = event.pathParameters || {};
+      const normalizedResource = resource.replace(/^\/urlify/, '');
 
-    if (httpMethod === 'GET' && normalizedResource === '/health') {
-      return successResponse('Service is healthy', {
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-      });
-    }
-
-    if (httpMethod === 'POST' && normalizedResource === '/shorten') {
-      const body = parseBodyToJson(event.body);
-
-      if (!body || !body.originalUrl) {
-        return badRequestResponse('Missing required field: originalUrl', [
-          { code: 'MISSING_FIELD', detail: 'Original URL is required' },
-        ]);
-      }
-
-      const { originalUrl, createdBy, autoDelete, ttlDays } = body;
-
-      if (
-        ttlDays !== undefined &&
-        (typeof ttlDays !== 'number' || ttlDays <= 0)
-      ) {
-        return badRequestResponse('Invalid ttlDays value', [
-          {
-            code: 'INVALID_TTL_DAYS',
-            detail: 'ttlDays must be a positive number of days',
-          },
-        ]);
-      }
-
-      if (autoDelete !== undefined && typeof autoDelete !== 'boolean') {
-        return badRequestResponse('Invalid autoDelete value', [
-          {
-            code: 'INVALID_AUTO_DELETE',
-            detail: 'autoDelete must be a boolean',
-          },
-        ]);
-      }
-
-      const resolvedTtlDays = autoDelete
-        ? (ttlDays ?? DEFAULT_TTL_DAYS)
-        : undefined;
-
-      try {
-        const urlData = await createShortUrl(
-          originalUrl,
-          createdBy,
-          resolvedTtlDays
-        );
-
-        const expiresAt = urlData.TTL
-          ? new Date(urlData.TTL * 1000).toISOString()
-          : undefined;
-
-        return createdResponse('URL shortened successfully', {
-          shortCode: urlData.ShortCode,
-          shortUrl: `${BASE_URL}/${urlData.ShortCode}`,
-          originalUrl: urlData.OriginalUrl,
-          createdAt: new Date(urlData.CreatedAt).toISOString(),
-          ...(expiresAt ? { expiresAt } : {}),
+      if (httpMethod === 'GET' && normalizedResource === '/health') {
+        return successResponse('Service is healthy', {
+          status: 'ok',
+          timestamp: new Date().toISOString(),
         });
-      } catch (error: any) {
-        if (error.message === 'Invalid URL format') {
-          return badRequestResponse('Invalid URL format', [
-            { code: 'INVALID_URL', detail: 'Please provide a valid URL' },
+      }
+
+      if (httpMethod === 'POST' && normalizedResource === '/shorten') {
+        const body = parseBodyToJson(event.body);
+
+        if (!body || !body.originalUrl) {
+          return badRequestResponse('Missing required field: originalUrl', [
+            { code: 'MISSING_FIELD', detail: 'Original URL is required' },
           ]);
         }
-        throw error;
+
+        const { originalUrl, createdBy, autoDelete, ttlDays } = body;
+
+        if (
+          ttlDays !== undefined &&
+          (typeof ttlDays !== 'number' || ttlDays <= 0)
+        ) {
+          return badRequestResponse('Invalid ttlDays value', [
+            {
+              code: 'INVALID_TTL_DAYS',
+              detail: 'ttlDays must be a positive number of days',
+            },
+          ]);
+        }
+
+        if (autoDelete !== undefined && typeof autoDelete !== 'boolean') {
+          return badRequestResponse('Invalid autoDelete value', [
+            {
+              code: 'INVALID_AUTO_DELETE',
+              detail: 'autoDelete must be a boolean',
+            },
+          ]);
+        }
+
+        const resolvedTtlDays = autoDelete
+          ? (ttlDays ?? DEFAULT_TTL_DAYS)
+          : undefined;
+
+        try {
+          const urlData = await createShortUrl(
+            originalUrl,
+            createdBy,
+            resolvedTtlDays
+          );
+
+          const expiresAt = urlData.TTL
+            ? new Date(urlData.TTL * 1000).toISOString()
+            : undefined;
+
+          return createdResponse('URL shortened successfully', {
+            shortCode: urlData.ShortCode,
+            shortUrl: `${BASE_URL}/${urlData.ShortCode}`,
+            originalUrl: urlData.OriginalUrl,
+            createdAt: new Date(urlData.CreatedAt).toISOString(),
+            ...(expiresAt ? { expiresAt } : {}),
+          });
+        } catch (error: any) {
+          if (error.message === 'Invalid URL format') {
+            return badRequestResponse('Invalid URL format', [
+              { code: 'INVALID_URL', detail: 'Please provide a valid URL' },
+            ]);
+          }
+          throw error;
+        }
       }
+
+      if (httpMethod === 'GET' && normalizedResource.startsWith('/stats/')) {
+        const { shortCode } = pathParameters;
+
+        if (!shortCode) {
+          return badRequestResponse('Missing short code', [
+            { code: 'MISSING_PARAM', detail: 'Short code is required' },
+          ]);
+        }
+
+        const urlData = await getUrlByShortCode(shortCode);
+
+        if (!urlData) {
+          return notFoundResponse(`Short URL not found: ${shortCode}`);
+        }
+
+        return successResponse('URL statistics retrieved successfully', {
+          shortCode: urlData.ShortCode,
+          originalUrl: urlData.OriginalUrl,
+          clicks: urlData.Clicks,
+          createdAt: new Date(urlData.CreatedAt).toISOString(),
+          lastAccessed: urlData.LastAccessed
+            ? new Date(urlData.LastAccessed).toISOString()
+            : null,
+          ...(urlData.TTL
+            ? { expiresAt: new Date(urlData.TTL * 1000).toISOString() }
+            : {}),
+          createdBy: urlData.CreatedBy,
+        });
+      }
+
+      if (httpMethod === 'GET' && normalizedResource === '/urls') {
+        const queryParams = event.queryStringParameters || {};
+        const limit = parseInt(queryParams.limit || '20');
+        const lastKey = queryParams.lastKey
+          ? JSON.parse(queryParams.lastKey)
+          : undefined;
+
+        const result = await listUrls(limit, lastKey);
+
+        const urls = result.items.map((item: any) => ({
+          shortCode: item.ShortCode,
+          shortUrl: `${BASE_URL}/${item.ShortCode}`,
+          originalUrl: item.OriginalUrl,
+          clicks: item.Clicks,
+          createdAt: new Date(item.CreatedAt).toISOString(),
+          lastAccessed: item.LastAccessed
+            ? new Date(item.LastAccessed).toISOString()
+            : null,
+          ...(item.TTL
+            ? { expiresAt: new Date(item.TTL * 1000).toISOString() }
+            : {}),
+        }));
+
+        return successResponse('URLs retrieved successfully', {
+          urls,
+          count: urls.length,
+          lastEvaluatedKey: result.lastEvaluatedKey,
+        });
+      }
+
+      if (httpMethod === 'DELETE' && normalizedResource.startsWith('/url/')) {
+        const { shortCode } = pathParameters;
+
+        if (!shortCode) {
+          return badRequestResponse('Missing short code', [
+            { code: 'MISSING_PARAM', detail: 'Short code is required' },
+          ]);
+        }
+
+        const deleted = await deleteUrl(shortCode);
+
+        if (!deleted) {
+          return notFoundResponse(`Short URL not found: ${shortCode}`);
+        }
+
+        return successResponse('URL deleted successfully', {
+          shortCode,
+          deleted: true,
+        });
+      }
+
+      return notFoundResponse(
+        `Endpoint not found: ${httpMethod} ${normalizedResource || resource}`
+      );
+    } catch (error) {
+      console.error('Error in URL shortener operation:', error);
+      return serverErrorResponse(
+        'An error occurred while processing your request',
+        [{ detail: error instanceof Error ? error.message : 'Unknown error' }]
+      );
     }
-
-    if (httpMethod === 'GET' && normalizedResource.startsWith('/stats/')) {
-      const { shortCode } = pathParameters;
-
-      if (!shortCode) {
-        return badRequestResponse('Missing short code', [
-          { code: 'MISSING_PARAM', detail: 'Short code is required' },
-        ]);
-      }
-
-      const urlData = await getUrlByShortCode(shortCode);
-
-      if (!urlData) {
-        return notFoundResponse(`Short URL not found: ${shortCode}`);
-      }
-
-      return successResponse('URL statistics retrieved successfully', {
-        shortCode: urlData.ShortCode,
-        originalUrl: urlData.OriginalUrl,
-        clicks: urlData.Clicks,
-        createdAt: new Date(urlData.CreatedAt).toISOString(),
-        lastAccessed: urlData.LastAccessed
-          ? new Date(urlData.LastAccessed).toISOString()
-          : null,
-        ...(urlData.TTL
-          ? { expiresAt: new Date(urlData.TTL * 1000).toISOString() }
-          : {}),
-        createdBy: urlData.CreatedBy,
-      });
-    }
-
-    if (httpMethod === 'GET' && normalizedResource === '/urls') {
-      const queryParams = event.queryStringParameters || {};
-      const limit = parseInt(queryParams.limit || '20');
-      const lastKey = queryParams.lastKey
-        ? JSON.parse(queryParams.lastKey)
-        : undefined;
-
-      const result = await listUrls(limit, lastKey);
-
-      const urls = result.items.map((item: any) => ({
-        shortCode: item.ShortCode,
-        shortUrl: `${BASE_URL}/${item.ShortCode}`,
-        originalUrl: item.OriginalUrl,
-        clicks: item.Clicks,
-        createdAt: new Date(item.CreatedAt).toISOString(),
-        lastAccessed: item.LastAccessed
-          ? new Date(item.LastAccessed).toISOString()
-          : null,
-        ...(item.TTL
-          ? { expiresAt: new Date(item.TTL * 1000).toISOString() }
-          : {}),
-      }));
-
-      return successResponse('URLs retrieved successfully', {
-        urls,
-        count: urls.length,
-        lastEvaluatedKey: result.lastEvaluatedKey,
-      });
-    }
-
-    if (httpMethod === 'DELETE' && normalizedResource.startsWith('/url/')) {
-      const { shortCode } = pathParameters;
-
-      if (!shortCode) {
-        return badRequestResponse('Missing short code', [
-          { code: 'MISSING_PARAM', detail: 'Short code is required' },
-        ]);
-      }
-
-      const deleted = await deleteUrl(shortCode);
-
-      if (!deleted) {
-        return notFoundResponse(`Short URL not found: ${shortCode}`);
-      }
-
-      return successResponse('URL deleted successfully', {
-        shortCode,
-        deleted: true,
-      });
-    }
-
-    return notFoundResponse(
-      `Endpoint not found: ${httpMethod} ${normalizedResource || resource}`
-    );
-  } catch (error) {
-    console.error('Error in URL shortener operation:', error);
-    return serverErrorResponse(
-      'An error occurred while processing your request',
-      [{ detail: error instanceof Error ? error.message : 'Unknown error' }]
-    );
   }
-});
+);
