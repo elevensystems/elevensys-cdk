@@ -72,7 +72,10 @@ export class BaseApiStack extends Stack {
         tracingEnabled: false,
       },
       defaultCorsPreflightOptions: {
-        allowOrigins: ['https://satio.dev', 'https://elevensystems.dev'],
+        allowOrigins: [
+          'https://logwork.fhmhub.com',
+          'https://elevensystems.dev',
+        ],
         allowMethods: apigateway.Cors.ALL_METHODS,
         allowHeaders: [
           'Content-Type',

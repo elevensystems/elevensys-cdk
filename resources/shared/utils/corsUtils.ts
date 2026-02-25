@@ -1,7 +1,7 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 
 const ALLOWED_ORIGINS: string[] = [
-  'https://satio.dev',
+  'https://logwork.fhmhub.com',
   'https://elevensystems.dev',
 ];
 
