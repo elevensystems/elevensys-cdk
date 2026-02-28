@@ -59,7 +59,7 @@ const ROUTES: Record<string, RouteConfig> = {
       url.searchParams.set('fromDate', params.fromDate!);
       url.searchParams.set('toDate', params.toDate!);
       url.searchParams.set('user', params.user!);
-      url.searchParams.set('statusWorklog', 'All');
+      url.searchParams.set('statusWorklog', params.statusWorklog || 'All');
       return url.toString();
     },
   },
@@ -67,7 +67,7 @@ const ROUTES: Record<string, RouteConfig> = {
   'GET /timesheet/project-worklogs': {
     method: 'GET',
     path: 'project-worklogs/get-list',
-    requiredQueryParams: ['fromDate', 'toDate'],
+    requiredQueryParams: ['projectKey', 'fromDate', 'toDate'],
     buildUrl: (ji, event) =>
       forwardQueryParams(
         event,
@@ -78,7 +78,7 @@ const ROUTES: Record<string, RouteConfig> = {
   'GET /timesheet/project-worklogs/pagination': {
     method: 'GET',
     path: 'project-worklogs/get-page-list',
-    requiredQueryParams: ['fromDate', 'toDate'],
+    requiredQueryParams: ['projectKey', 'fromDate', 'toDate'],
     buildUrl: (ji, event) =>
       forwardQueryParams(
         event,
