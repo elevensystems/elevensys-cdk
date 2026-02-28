@@ -28,10 +28,10 @@ import * as path from 'path';
  * - GET /timesheet/timesheet-dates?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch timesheet dates
  * - POST /timesheet/logwork?jiraInstance=jiradc - Log work entry to Jira
  * - POST /timesheet/project-worklogs-warning?jiraInstance=jiradc - Get project worklogs warning report
+ * - POST /timesheet/project-worklogs-report/get-all?jiraInstance=jiradc - Get all project worklogs report
  * - GET /timesheet/projects?jiraInstance=jiradc - Fetch all Jira projects
  * - GET /timesheet/projects/{projectId}?jiraInstance=jiradc - Fetch a specific Jira project by ID
  * - POST /timesheet/projects - Fetch issues using payload
- * - GET /timesheet/projects/{projectId}/issues - Fetch issues for a project
  * - GET /timesheet/issue/{issueId} - Fetch a specific Jira issue
  */
 export interface TimesheetCoreStackProps extends StackProps {
@@ -128,6 +128,13 @@ export class TimesheetCoreStack extends Stack {
       .addResource('project-worklogs-warning')
       .addMethod('POST', proxyIntegration);
 
+    // POST /timesheet/project-worklogs-report/get-all
+    const projectWorklogsReportResource =
+      timesheetResource.addResource('project-worklogs-report');
+    projectWorklogsReportResource
+      .addResource('get-all')
+      .addMethod('POST', proxyIntegration);
+
     // GET /timesheet/issue/{issueId}
     timesheetResource
       .addResource('issue')
@@ -141,7 +148,6 @@ export class TimesheetCoreStack extends Stack {
     projectsResource.addMethod('POST', proxyIntegration);
     const projectIdResource = projectsResource.addResource('{projectId}');
     projectIdResource.addMethod('GET', proxyIntegration);
-    projectIdResource.addResource('issues').addMethod('GET', proxyIntegration);
 
     // =========================================================================
     // Outputs

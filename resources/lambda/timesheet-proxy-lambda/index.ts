@@ -160,6 +160,17 @@ const ROUTES: Record<string, RouteConfig> = {
       `${JIRA_BASE}/${ji}/rest/hunger/1.0/project-my-worklogs-report/get-warning`,
   },
 
+  'POST /timesheet/project-worklogs-report/get-all': {
+    method: 'POST',
+    path: 'project-worklogs-report/get-all',
+    requiredBodyFields: ['pid', 'startDate', 'endDate'],
+    buildUrl: (ji, event) =>
+      forwardQueryParams(
+        event,
+        `${JIRA_BASE}/${ji}/rest/hunger/1.0/project-worklogs-report/get-all`
+      ),
+  },
+
   'GET /timesheet/projects': {
     method: 'GET',
     path: 'project',
@@ -227,118 +238,118 @@ function errorResponse(
   };
 }
 
-export const handler = withCors(async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
-  try {
-    // 1. Auth extraction
-    const authHeader =
-      event.headers['Authorization'] || event.headers['authorization'];
-    if (!authHeader) {
-      return errorResponse(401, 'Missing Authorization header');
-    }
-    const token = authHeader.replace('Bearer ', '');
+export const handler = withCors(
+  async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+    try {
+      // 1. Auth extraction
+      const authHeader =
+        event.headers['Authorization'] || event.headers['authorization'];
+      if (!authHeader) {
+        return errorResponse(401, 'Missing Authorization header');
+      }
+      const token = authHeader.replace('Bearer ', '');
 
-    // 2. Route resolution
-    const route = resolveRoute(event);
-    if (!route) {
-      return errorResponse(
-        404,
-        `Unknown route: ${event.httpMethod} ${event.resource}`
-      );
-    }
-
-    // 3. Validate required query params
-    if (route.requiredQueryParams) {
-      const params = event.queryStringParameters || {};
-      const missing = route.requiredQueryParams.filter((p) => !params[p]);
-      if (missing.length > 0) {
+      // 2. Route resolution
+      const route = resolveRoute(event);
+      if (!route) {
         return errorResponse(
-          400,
-          `Missing required query parameters: ${missing.join(', ')}`
+          404,
+          `Unknown route: ${event.httpMethod} ${event.resource}`
         );
       }
-    }
 
-    // 4. Validate required path params
-    if (route.requiredPathParams) {
-      const pathParams = event.pathParameters || {};
-      const missing = route.requiredPathParams.filter((p) => !pathParams[p]);
-      if (missing.length > 0) {
-        return errorResponse(
-          400,
-          `Missing required path parameters: ${missing.join(', ')}`
-        );
+      // 3. Validate required query params
+      if (route.requiredQueryParams) {
+        const params = event.queryStringParameters || {};
+        const missing = route.requiredQueryParams.filter((p) => !params[p]);
+        if (missing.length > 0) {
+          return errorResponse(
+            400,
+            `Missing required query parameters: ${missing.join(', ')}`
+          );
+        }
       }
-    }
 
-    // 5. Validate required body fields (POST routes)
-    let body: any = null;
-    if (route.requiredBodyFields) {
-      body = parseBodyToJson(event.body);
-      if (!body) {
-        return errorResponse(400, 'Missing or invalid request body');
+      // 4. Validate required path params
+      if (route.requiredPathParams) {
+        const pathParams = event.pathParameters || {};
+        const missing = route.requiredPathParams.filter((p) => !pathParams[p]);
+        if (missing.length > 0) {
+          return errorResponse(
+            400,
+            `Missing required path parameters: ${missing.join(', ')}`
+          );
+        }
       }
-      const missing = route.requiredBodyFields.filter((f) => !body[f]);
-      if (missing.length > 0) {
-        return errorResponse(
-          400,
-          `Missing required fields: ${missing.join(', ')}`
-        );
+
+      // 5. Validate required body fields (POST routes)
+      let body: any = null;
+      if (route.requiredBodyFields) {
+        body = parseBodyToJson(event.body);
+        if (!body) {
+          return errorResponse(400, 'Missing or invalid request body');
+        }
+        const missing = route.requiredBodyFields.filter((f) => !body[f]);
+        if (missing.length > 0) {
+          return errorResponse(
+            400,
+            `Missing required fields: ${missing.join(', ')}`
+          );
+        }
       }
+
+      // 6. Build URL and execute request
+      const jiraInstance = ((body?.jiraInstance as JiraInstance) ||
+        (event.queryStringParameters?.jiraInstance as JiraInstance) ||
+        'jiradc') as JiraInstance;
+      const url = route.buildUrl(jiraInstance, event);
+      const headers = createJiraHeaders(token, jiraInstance);
+
+      console.log(`[${route.method}] ${url}`);
+
+      let response;
+      if (route.method === 'POST') {
+        body = route.buildBody
+          ? route.buildBody(event)
+          : body || parseBodyToJson(event.body);
+        const requestHeaders = route.contentType
+          ? { ...headers, 'Content-Type': route.contentType }
+          : headers;
+        response = await axios.post(url, body, {
+          headers: requestHeaders,
+          timeout: 15000,
+        });
+      } else if (route.method === 'DELETE') {
+        response = await axios.delete(url, { headers, timeout: 15000 });
+      } else {
+        response = await axios.get(url, { headers, timeout: 15000 });
+      }
+
+      console.log(`Response status: ${response.status}`);
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ success: true, data: response.data }),
+      };
+    } catch (error: any) {
+      console.error('Proxy error:', error);
+
+      const statusCode = error.response?.status || 500;
+      const errorMessage =
+        error.response?.data || error.message || 'Internal server error';
+
+      return {
+        statusCode,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          error:
+            typeof errorMessage === 'string'
+              ? errorMessage
+              : JSON.stringify(errorMessage),
+          status: statusCode,
+        }),
+      };
     }
-
-    // 6. Build URL and execute request
-    const jiraInstance = ((body?.jiraInstance as JiraInstance) ||
-      (event.queryStringParameters?.jiraInstance as JiraInstance) ||
-      'jiradc') as JiraInstance;
-    const url = route.buildUrl(jiraInstance, event);
-    const headers = createJiraHeaders(token, jiraInstance);
-
-    console.log(`[${route.method}] ${url}`);
-
-    let response;
-    if (route.method === 'POST') {
-      body = route.buildBody
-        ? route.buildBody(event)
-        : body || parseBodyToJson(event.body);
-      const requestHeaders = route.contentType
-        ? { ...headers, 'Content-Type': route.contentType }
-        : headers;
-      response = await axios.post(url, body, {
-        headers: requestHeaders,
-        timeout: 15000,
-      });
-    } else if (route.method === 'DELETE') {
-      response = await axios.delete(url, { headers, timeout: 15000 });
-    } else {
-      response = await axios.get(url, { headers, timeout: 15000 });
-    }
-
-    console.log(`Response status: ${response.status}`);
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ success: true, data: response.data }),
-    };
-  } catch (error: any) {
-    console.error('Proxy error:', error);
-
-    const statusCode = error.response?.status || 500;
-    const errorMessage =
-      error.response?.data || error.message || 'Internal server error';
-
-    return {
-      statusCode,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        error:
-          typeof errorMessage === 'string'
-            ? errorMessage
-            : JSON.stringify(errorMessage),
-        status: statusCode,
-      }),
-    };
   }
-});
+);
