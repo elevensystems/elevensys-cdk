@@ -197,6 +197,16 @@ const ROUTES: Record<string, RouteConfig> = {
     },
   },
 
+  'PUT /timesheet/project-worklogs/{issueId}': {
+    method: 'PUT',
+    path: 'project-worklogs/{worklogId}',
+    requiredPathParams: ['issueId'],
+    buildUrl: (ji, event) => {
+      const { issueId } = event.pathParameters!;
+      return `${JIRA_BASE}/${ji}/rest/tempo/1.0/project-worklogs/${issueId}`;
+    },
+  },
+
   'POST /timesheet/projects': {
     method: 'POST',
     path: 'issueNav/1/issueTable',
@@ -319,6 +329,9 @@ export const handler = withCors(
           headers: requestHeaders,
           timeout: 15000,
         });
+      } else if (route.method === 'PUT') {
+        body = body || parseBodyToJson(event.body);
+        response = await axios.put(url, body, { headers, timeout: 15000 });
       } else if (route.method === 'DELETE') {
         response = await axios.delete(url, { headers, timeout: 15000 });
       } else {

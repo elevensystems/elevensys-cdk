@@ -23,6 +23,7 @@ import * as path from 'path';
  * - GET /timesheet/worklogs?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch user worklogs
  * - GET /timesheet/project-worklogs?fromDate=x&toDate=y&jiraInstance=jiradc - Fetch project worklogs
  * - GET /timesheet/project-worklogs/pagination?fromDate=x&toDate=y&jiraInstance=jiradc - Fetch project worklogs pagination
+ * - PUT /timesheet/project-worklogs/{worklogId}?jiraInstance=jiradc - Update a project worklog entry
  * - DELETE /timesheet/project-worklogs/{issueId}/{timesheetId}?jiraInstance=jiradc - Delete timesheet entry
  * - GET /timesheet/timesheet-view?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch timesheet calendar view
  * - GET /timesheet/timesheet-dates?fromDate=x&toDate=y&user=z&jiraInstance=jiradc - Fetch timesheet dates
@@ -104,6 +105,7 @@ export class TimesheetCoreStack extends Stack {
       .addResource('pagination')
       .addMethod('GET', proxyIntegration);
     const issueIdResource = projectWorklogsResource.addResource('{issueId}');
+    issueIdResource.addMethod('PUT', proxyIntegration);
     issueIdResource
       .addResource('{timesheetId}')
       .addMethod('DELETE', proxyIntegration);
