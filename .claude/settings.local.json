@@ -8,9 +8,15 @@
       "Bash(npx jest:*)",
       "Bash(npm install:*)",
       "Bash(npm test:*)",
-      "Bash(npx commitlint:*)"
+      "Bash(npx commitlint:*)",
+      "Bash(git push:*)",
+      "Bash(git checkout:*)"
     ]
   },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "awslabs.cdk-mcp-server"
+  ],
   "statusLine": {
     "type": "command",
     "command": "sh E:\\code\\elevensys-cdk\\.claude\\statusline-command.sh"

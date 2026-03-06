@@ -25,6 +25,15 @@ All services share a common API Gateway at `api.elevensys.dev`.
 
 ```
 elevensys-cdk/
+├── .claude/                      # Claude Code configuration
+│   ├── agents/                   # Custom AI agents
+│   │   └── cdk-review.md        # CDK audit agent (readability, performance, best practices)
+│   ├── skills/                   # Reusable AI skills
+│   │   ├── aws-cdk/             # AWS CDK expert skill + references
+│   │   ├── git-skill/           # Git workflow skill + references
+│   │   └── explain-code/        # Code explanation skill
+│   ├── settings.json            # Shared Claude Code settings
+│   └── settings.local.json      # Local-only Claude Code settings (gitignored)
 ├── bin/                          # CDK app entry point
 │   └── elevensys-cdk.ts         # Main application - stack orchestration
 ├── lib/
@@ -323,6 +332,33 @@ GitHub Actions workflow (`.github/workflows/deploy.yml`):
 - **Lambda Timeout:** Check memory allocation and external API calls
 - **CORS Issues:** Verify CORS headers in responseUtils and API Gateway config
 - **SSL Errors:** Ensure certificate is in correct region (us-east-1 for CloudFront)
+
+## Claude Code Configuration
+
+The `.claude/` directory contains project-level Claude Code configuration committed to the repo.
+
+### Agents (`.claude/agents/`)
+
+Custom subagents invoked automatically by Claude Code for specialized tasks:
+
+| Agent | Trigger | Purpose |
+|-------|---------|---------|
+| `cdk-review` | "review my CDK project", "audit this stack", "find CDK issues" | Full CDK audit across readability, performance, and best practices — produces a prioritized report with fixes |
+
+### Skills (`.claude/skills/`)
+
+Reusable skill files that load domain knowledge into Claude's context:
+
+| Skill | Trigger | Purpose |
+|-------|---------|---------|
+| `aws-cdk` | Any CDK task (stacks, constructs, resources) | Expert CDK patterns, references for Lambda, networking, storage, security, pipelines |
+| `git-skill` | Any Git operation | Safe Git workflows, branching, commits, conflict resolution |
+| `explain-code` | "how does this work?", explaining code | Code explanations with diagrams and analogies |
+
+### Settings
+
+- **`settings.json`** — Shared project settings (committed, applies to all contributors)
+- **`settings.local.json`** — Local overrides (not committed, personal preferences)
 
 ## Git Workflow
 
