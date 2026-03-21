@@ -18,25 +18,51 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout infra repo
+      - name: Checkout elevensys-cdk
         uses: actions/checkout@v4
+        with:
+          path: elevensys-cdk
+
+      - name: Checkout elevensys-core
+        uses: actions/checkout@v4
+        with:
+          repository: elevensystems/elevensys-core
+          path: elevensys-core
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install dependencies
+      - name: Build elevensys-core
+        working-directory: elevensys-core
+        run: |
+          npm ci
+          npm run build
+          npm ci --omit=dev
+
+      - name: Install CDK dependencies
+        working-directory: elevensys-cdk
         run: npm ci
 
       - name: Install AWS CDK
         run: npm install -g aws-cdk
 
       - name: Deploy with CDK
+        working-directory: elevensys-cdk
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          CDK_DEFAULT_ACCOUNT: ${{ secrets.CDK_DEFAULT_ACCOUNT }}
+          CDK_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          BASE_DOMAIN_NAME: ${{ secrets.BASE_DOMAIN_NAME }}
+          BASE_HOSTED_ZONE_ID: ${{ secrets.BASE_HOSTED_ZONE_ID }}
+          BASE_CERTIFICATE_ARN: ${{ secrets.BASE_CERTIFICATE_ARN }}
+          REDIRECT_DOMAIN_NAME: ${{ secrets.REDIRECT_DOMAIN_NAME }}
+          API_HOSTED_ZONE_ID: ${{ secrets.API_HOSTED_ZONE_ID }}
+          URLIFY_CERTIFICATE_ARN: ${{ secrets.URLIFY_CERTIFICATE_ARN }}
+          URLIFY_TABLE_NAME: ${{ secrets.URLIFY_TABLE_NAME }}
         run: |
           STACK_ARG="${{ github.event.inputs.stack }}"
           APPROVAL_ARG="${{ github.event.inputs.require_approval == 'true' && '' || '--require-approval never' }}"

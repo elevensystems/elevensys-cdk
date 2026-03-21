@@ -3,9 +3,7 @@ import * as dotenv from 'dotenv';
 import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import { BaseApiStack } from '../lib/stacks/base-api-stack';
-import { UrlifyStack } from '../lib/stacks/urlify-stack';
-import { TimesheetCoreStack } from '../lib/stacks/timesheet-core-stack';
-import { OpenAIStack } from '../lib/stacks/openai-stack';
+import { CoreStack } from '../lib/stacks/core-stack';
 
 // Load environment variables from .env file
 dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
@@ -36,26 +34,12 @@ const baseApiStack = new BaseApiStack(app, 'BaseApiStack', {
   certificateArn: baseCertificateArn,
 });
 
-// Deploy the OpenAI API stack (adds /openai endpoint)
-new OpenAIStack(app, 'OpenAIStack', {
+// Deploy the Core stack (elevensys-core as Lambda — handles all API domains)
+new CoreStack(app, 'CoreStack', {
   env,
   api: baseApiStack.api,
   baseApiUrl: baseApiStack.apiUrl,
-});
-
-// Deploy the Timesheet Core stack (adds /timesheet endpoint)
-new TimesheetCoreStack(app, 'TimesheetCoreStack', {
-  env,
-  api: baseApiStack.api,
-  baseApiUrl: baseApiStack.apiUrl,
-});
-
-// Deploy the URL Shortener stack (adds /urlify endpoint + separate redirect domain)
-new UrlifyStack(app, 'UrlifyStack', {
-  env,
   redirectDomain,
-  hostedZoneId: urlifyHostedZoneId,
-  certificateArn: urlifyCertificateArn,
-  api: baseApiStack.api,
-  baseApiUrl: baseApiStack.apiUrl,
+  urlifyHostedZoneId,
+  urlifyCertificateArn,
 });
