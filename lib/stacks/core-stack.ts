@@ -1,6 +1,7 @@
 import { Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
@@ -31,9 +32,9 @@ export class CoreStack extends Stack {
     super(scope, id, props);
 
     // =========================================================================
-    // DynamoDB: Auto Logwork configurations
+    // DynamoDB: Autolog configurations
     // =========================================================================
-    const autoLogworkTable = new dynamodb.Table(this, 'AutoLogworkTable', {
+    const autologTable = new dynamodb.Table(this, 'AutologTable', {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -108,15 +109,15 @@ export class CoreStack extends Stack {
         URLIFY_TABLE_NAME: urlifyTable.tableName,
         URLIFY_BASE_URL: `https://${props.redirectDomain}`,
         OPENAI_API_KEY: openaiApiKey.stringValue,
-        AUTO_LOGWORK_TABLE_NAME: autoLogworkTable.tableName,
+        AUTOLOG_TABLE_NAME: autologTable.tableName,
       },
     });
 
     urlifyTable.grantReadWriteData(coreLambda);
     openaiApiKey.grantRead(coreLambda);
-    autoLogworkTable.grantReadWriteData(coreLambda);
+    autologTable.grantReadWriteData(coreLambda);
 
-    // Allow coreLambda to read/write SSM parameters for auto-logwork tokens
+    // Allow coreLambda to read/write SSM parameters for autolog tokens
     coreLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: [
@@ -125,7 +126,7 @@ export class CoreStack extends Stack {
           'ssm:DeleteParameter',
         ],
         resources: [
-          `arn:aws:ssm:${this.region}:${this.account}:parameter/auto-logwork/*`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/autolog/*`,
         ],
       })
     );
@@ -238,52 +239,49 @@ function handler(event) {
     });
 
     // =========================================================================
-    // Auto Logwork Executor Lambda + EventBridge hourly trigger
+    // Autolog Executor Lambda + EventBridge hourly trigger
     // =========================================================================
     const executorLogGroup = new logs.LogGroup(
       this,
-      'AutoLogworkExecutorLogGroup',
+      'AutologExecutorLogGroup',
       { retention: RetentionDays.ONE_MONTH }
     );
 
-    const executorLambda = new lambda.Function(
+    const executorLambda = new lambdaNodejs.NodejsFunction(
       this,
-      'AutoLogworkExecutorLambda',
+      'AutologExecutorLambda',
       {
         runtime: Runtime.NODEJS_20_X,
         architecture: Architecture.ARM_64,
-        handler: 'index.handler',
-        code: lambda.Code.fromAsset(
-          path.join(
-            __dirname,
-            '../../resources/lambda/auto-logwork-executor-lambda'
-          )
+        handler: 'handler',
+        entry: path.join(
+          __dirname,
+          '../../resources/lambda/autolog-executor-lambda/index.ts'
         ),
         timeout: Duration.minutes(5),
         memorySize: 256,
         tracing: Tracing.ACTIVE,
         logGroup: executorLogGroup,
         environment: {
-          AUTO_LOGWORK_TABLE_NAME: autoLogworkTable.tableName,
+          AUTOLOG_TABLE_NAME: autologTable.tableName,
           APP_URL: props.baseApiUrl,
         },
       }
     );
 
-    autoLogworkTable.grantReadWriteData(executorLambda);
+    autologTable.grantReadWriteData(executorLambda);
 
-    // SSM: read Jira tokens stored at /auto-logwork/*
+    // SSM: read Jira tokens stored at /autolog/*
     executorLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ssm:GetParameter'],
         resources: [
-          `arn:aws:ssm:${this.region}:${this.account}:parameter/auto-logwork/*`,
+          `arn:aws:ssm:${this.region}:${this.account}:parameter/autolog/*`,
         ],
       })
     );
 
-    // SSM: update config status (paused_auth) requires write on core table — already granted above
-    // SES: send emails from auto-logwork@elevensys.dev
+    // SES: send emails
     executorLambda.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['ses:SendEmail', 'ses:SendRawEmail'],
@@ -292,10 +290,10 @@ function handler(event) {
     );
 
     // Trigger every hour
-    new events.Rule(this, 'AutoLogworkHourlyRule', {
+    new events.Rule(this, 'AutologHourlyRule', {
       schedule: events.Schedule.rate(Duration.hours(1)),
       targets: [new eventsTargets.LambdaFunction(executorLambda)],
-      description: 'Triggers auto-logwork executor every hour',
+      description: 'Triggers autolog executor every hour',
     });
   }
 }

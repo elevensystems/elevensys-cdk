@@ -1,8 +1,8 @@
-# Auto Logwork Feature — Specification
+# Autolog Feature — Specification
 
 ## Overview
 
-Auto Logwork automates the repetitive task of logging work to Jira. Users configure which tickets to log per project (with fixed hours), set a weekly or monthly schedule, and the system runs automatically — filling in missing worklog dates and emailing a confirmation.
+Autolog automates the repetitive task of logging work to Jira. Users configure which tickets to log per project (with fixed hours), set a weekly or monthly schedule, and the system runs automatically — filling in missing worklog dates and emailing a confirmation.
 
 ---
 
@@ -10,17 +10,17 @@ Auto Logwork automates the repetitive task of logging work to Jira. Users config
 
 ```
 elevensys-web (Next.js)
-  └── /auto-logwork page
-      └── calls api.elevensys.dev/auto-logwork/* (CRUD)
+  └── /timesheet/autolog page
+      └── calls api.elevensys.dev/timesheet/autolog/* (CRUD)
           └── elevensys-core (Ts.ED Lambda)
-              └── AutoLogworkController / AutoLogworkService
-                  └── DynamoDB AutoLogworkTable
+              └── AutologController / AutologService
+                  └── DynamoDB AutologTable
 
 elevensys-cdk (CDK)
   └── CoreStack
-      ├── AutoLogworkTable (DynamoDB)
+      ├── AutologTable (DynamoDB)
       ├── SES EmailIdentity (elevensys.dev)
-      └── AutoLogworkExecutorLambda
+      └── AutologExecutorLambda
           └── EventBridge Rule: every 1 hour
               → scan DynamoDB directly (DynamoDBService)
               → retrieve Jira token from SSM (SsmService)
@@ -33,7 +33,7 @@ elevensys-cdk (CDK)
 
 ## Data Model
 
-### DynamoDB — AutoLogworkTable
+### DynamoDB — AutologTable
 
 | Key | Value |
 |-----|-------|
@@ -70,7 +70,7 @@ elevensys-cdk (CDK)
 
 ### SSM Parameter Store
 
-- Path: `/auto-logwork/{username}/jira-token` (SecureString)
+- Path: `/autolog/{username}/jira-token` (SecureString)
 - Stored when user creates/updates a config
 - Deleted when user deletes a config
 
@@ -78,15 +78,15 @@ elevensys-cdk (CDK)
 
 ## API Endpoints (elevensys-core)
 
-All under `/auto-logwork`, protected by `BearerAuthMiddleware`.
+All under `/timesheet/autolog`, protected by `BearerAuthMiddleware`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/auto-logwork` | List configs for the authenticated user (max 3) |
-| POST | `/auto-logwork` | Create config — saves token to SSM |
-| PUT | `/auto-logwork/:configId` | Update config — re-saves token to SSM |
-| DELETE | `/auto-logwork/:configId` | Delete config + remove SSM token |
-| POST | `/auto-logwork/:configId/run` | Manual trigger (run immediately) |
+| GET | `/timesheet/autolog` | List configs for the authenticated user (max 3) |
+| POST | `/timesheet/autolog` | Create config — saves token to SSM |
+| PUT | `/timesheet/autolog/:configId` | Update config — re-saves token to SSM |
+| DELETE | `/timesheet/autolog/:configId` | Delete config + remove SSM token |
+| POST | `/timesheet/autolog/:configId/run` | Manual trigger (run immediately) |
 
 **Request body** (POST/PUT):
 ```json
@@ -114,9 +114,9 @@ All under `/auto-logwork`, protected by `BearerAuthMiddleware`.
 ## Scheduler (elevensys-cdk)
 
 - **Trigger**: EventBridge Rule, every hour
-- **Lambda**: `AutoLogworkExecutorLambda`
+- **Lambda**: `AutologExecutorLambda`
 - **Logic**:
-  1. Scan `AutoLogworkTable` for all `active` configs
+  1. Scan `AutologTable` for all `active` configs
   2. Filter configs due this UTC hour:
      - **weekly**: `dayOfWeek === today.dayOfWeek && hour === now.hour`
      - **monthly**: `dayOfMonth === today.date && hour === now.hour`
@@ -143,15 +143,15 @@ All under `/auto-logwork`, protected by `BearerAuthMiddleware`.
 ## Email
 
 ### Success
-- **Subject**: `[Auto Logwork] {projectName} — {startDate} to {endDate}`
+- **Subject**: `[Autolog] {projectName} — {startDate} to {endDate}`
 - **Body**: Dates logged, ticket breakdown (issueKey: Xh × N dates), link to timesheet
 
 ### Re-auth required
-- **Subject**: `[Auto Logwork] Action required — {projectName}`
-- **Body**: Token expired, link to `/auto-logwork` to re-authenticate
+- **Subject**: `[Autolog] Action required — {projectName}`
+- **Body**: Token expired, link to `/timesheet/autolog` to re-authenticate
 
 ### Nothing to log
-- **Subject**: `[Auto Logwork] {projectName} — nothing to log`
+- **Subject**: `[Autolog] {projectName} — nothing to log`
 - **Body**: All worklogs already submitted for the period
 
 ---
@@ -159,7 +159,7 @@ All under `/auto-logwork`, protected by `BearerAuthMiddleware`.
 ## Frontend (elevensys-web)
 
 ### Route
-`/auto-logwork` — new dedicated page
+`/timesheet/autolog` — dedicated page
 
 ### UI Flow
 1. Page lists existing configs (cards), max 3 per user

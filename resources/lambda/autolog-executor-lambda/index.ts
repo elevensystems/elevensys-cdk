@@ -1,17 +1,14 @@
 import axios from 'axios';
-import {
-  SESClient,
-  SendEmailCommand,
-} from '@aws-sdk/client-ses';
+import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
 import { DynamoDBService } from '../../shared/services/dynamoDbClient.js';
 import { SSMService } from '../../shared/services/ssmClient.js';
 import { createJiraHeaders, sleep } from '../../shared/utils/httpUtils.js';
 import type { JiraInstance } from '../../shared/models/types.js';
 
-const TABLE_NAME = process.env.AUTO_LOGWORK_TABLE_NAME!;
+const TABLE_NAME = process.env.AUTOLOG_TABLE_NAME!;
 const APP_URL = process.env.APP_URL || 'https://elevensys.dev';
 const JIRA_BASE = 'https://insight.fsoft.com.vn';
-const FROM_EMAIL = 'auto-logwork@elevensys.dev';
+const FROM_EMAIL = 'baohq11@gmail.com';
 const REQUEST_DELAY_MS = 500;
 
 const db = new DynamoDBService();
@@ -20,20 +17,20 @@ const ses = new SESClient({});
 
 // ---- Types ----------------------------------------------------------------
 
-interface AutoLogworkTicket {
+interface AutologTicket {
   issueKey: string;
   hours: number;
   description?: string;
 }
 
-interface AutoLogworkSchedule {
+interface AutologSchedule {
   type: 'weekly' | 'monthly';
   dayOfWeek?: number;
   dayOfMonth?: number;
   hour: number;
 }
 
-interface AutoLogworkConfig {
+interface AutologConfig {
   PK: string;
   SK: string;
   configId: string;
@@ -43,8 +40,8 @@ interface AutoLogworkConfig {
   projectId: string;
   projectKey: string;
   projectName: string;
-  tickets: AutoLogworkTicket[];
-  schedule: AutoLogworkSchedule;
+  tickets: AutologTicket[];
+  schedule: AutologSchedule;
   status: 'active' | 'paused_auth';
   createdAt: string;
   updatedAt: string;
@@ -81,7 +78,10 @@ function formatDate(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
-function getPeriod(config: AutoLogworkConfig, now: Date): { startDate: string; endDate: string } {
+function getPeriod(
+  config: AutologConfig,
+  now: Date
+): { startDate: string; endDate: string } {
   if (config.schedule.type === 'weekly') {
     const monday = getMondayOfWeek(now);
     return {
@@ -95,7 +95,7 @@ function getPeriod(config: AutoLogworkConfig, now: Date): { startDate: string; e
   };
 }
 
-function isDue(config: AutoLogworkConfig, now: Date): boolean {
+function isDue(config: AutologConfig, now: Date): boolean {
   const { schedule } = config;
   if (schedule.hour !== now.getUTCHours()) return false;
   if (schedule.type === 'weekly') {
@@ -107,7 +107,7 @@ function isDue(config: AutoLogworkConfig, now: Date): boolean {
 // ---- Jira helpers ---------------------------------------------------------
 
 async function getMissingDates(
-  config: AutoLogworkConfig,
+  config: AutologConfig,
   token: string,
   startDate: string,
   endDate: string
@@ -123,7 +123,11 @@ async function getMissingDates(
       { headers, timeout: 25000 }
     );
     const data: Array<{ value?: string }> = res.data ?? [];
-    return data.map((e) => e.value).filter(Boolean) as string[];
+    return data
+      .map((e) => e.value)
+      .filter(Boolean)
+      .flatMap((v) => (v as string).split(',').map((d) => d.trim()))
+      .filter(Boolean);
   } catch (err: any) {
     const status = err.response?.status;
     if (status === 401 || status === 403) {
@@ -149,7 +153,7 @@ async function getTypeOfWork(
 }
 
 async function logWork(
-  ticket: AutoLogworkTicket,
+  ticket: AutologTicket,
   date: string,
   username: string,
   ji: JiraInstance,
@@ -192,15 +196,23 @@ async function logWork(
 // ---- DynamoDB helpers -----------------------------------------------------
 
 async function updateConfigStatus(
-  config: AutoLogworkConfig,
-  patch: Partial<AutoLogworkConfig>
+  config: AutologConfig,
+  patch: Partial<AutologConfig>
 ): Promise<void> {
-  await db.putItem(TABLE_NAME, { ...config, ...patch, updatedAt: new Date().toISOString() });
+  await db.putItem(TABLE_NAME, {
+    ...config,
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  });
 }
 
 // ---- SES email helpers ----------------------------------------------------
 
-async function sendEmail(to: string, subject: string, htmlBody: string): Promise<void> {
+async function sendEmail(
+  to: string,
+  subject: string,
+  htmlBody: string
+): Promise<void> {
   try {
     await ses.send(
       new SendEmailCommand({
@@ -218,11 +230,16 @@ async function sendEmail(to: string, subject: string, htmlBody: string): Promise
 }
 
 function buildSuccessEmail(
-  config: AutoLogworkConfig,
+  config: AutologConfig,
   startDate: string,
   endDate: string,
   loggedDates: string[],
-  results: Array<{ issueKey: string; successCount: number; totalDates: number; hours: number }>
+  results: Array<{
+    issueKey: string;
+    successCount: number;
+    totalDates: number;
+    hours: number;
+  }>
 ): string {
   const datesHtml =
     loggedDates.length > 0
@@ -238,7 +255,7 @@ function buildSuccessEmail(
 
   return `
 <html><body style="font-family:sans-serif;color:#333">
-<h2>Auto Logwork — ${config.projectName}</h2>
+<h2>Autolog — ${config.projectName}</h2>
 <p>Period: <strong>${startDate}</strong> to <strong>${endDate}</strong></p>
 <h3>Dates logged:</h3>
 <ul>${datesHtml}</ul>
@@ -255,13 +272,13 @@ ${
 </body></html>`;
 }
 
-function buildReauthEmail(config: AutoLogworkConfig): string {
+function buildReauthEmail(config: AutologConfig): string {
   return `
 <html><body style="font-family:sans-serif;color:#333">
-<h2>Action Required — Auto Logwork</h2>
+<h2>Action Required — Autolog</h2>
 <p>Your Jira token for project <strong>${config.projectName}</strong> has expired or is invalid.</p>
-<p>Auto logwork has been <strong>paused</strong> for this configuration.</p>
-<p><a href="${APP_URL}/auto-logwork">Re-authenticate here</a> to resume automatic logging.</p>
+<p>Autolog has been <strong>paused</strong> for this configuration.</p>
+<p><a href="${APP_URL}/timesheet/autolog">Re-authenticate here</a> to resume automatic logging.</p>
 </body></html>`;
 }
 
@@ -269,9 +286,9 @@ function buildReauthEmail(config: AutoLogworkConfig): string {
 
 export const handler = async (): Promise<void> => {
   const now = new Date();
-  console.log(`Auto logwork executor started at ${now.toISOString()}`);
+  console.log(`Autolog executor started at ${now.toISOString()}`);
 
-  const configs = await db.scanItems<AutoLogworkConfig>(TABLE_NAME, {
+  const configs = await db.scanItems<AutologConfig>(TABLE_NAME, {
     FilterExpression: '#s = :active',
     ExpressionAttributeNames: { '#s': 'status' },
     ExpressionAttributeValues: { ':active': 'active' },
@@ -281,18 +298,26 @@ export const handler = async (): Promise<void> => {
   console.log(`Found ${dueConfigs.length} configs due this hour`);
 
   for (const config of dueConfigs) {
-    console.log(`Processing config ${config.configId} for user ${config.username}`);
+    console.log(
+      `Processing config ${config.configId} for user ${config.username}`
+    );
 
     // 1. Get Jira token from SSM
     let token: string;
     try {
-      token = await ssm.getParameterValue(`/auto-logwork/${config.username}/jira-token`);
+      token = await ssm.getParameterValue(
+        `/autolog/${config.username.toLowerCase()}/jira-token`
+      );
     } catch (err) {
       console.error(`Failed to retrieve token for ${config.username}:`, err);
-      await updateConfigStatus(config, { status: 'paused_auth', lastRunAt: now.toISOString(), lastRunStatus: 'failed' });
+      await updateConfigStatus(config, {
+        status: 'paused_auth',
+        lastRunAt: now.toISOString(),
+        lastRunStatus: 'failed',
+      });
       await sendEmail(
         config.email,
-        `[Auto Logwork] Action required — ${config.projectName}`,
+        `[Autolog] Action required — ${config.projectName}`,
         buildReauthEmail(config)
       );
       continue;
@@ -304,22 +329,37 @@ export const handler = async (): Promise<void> => {
     // 3. Get missing dates from Jira
     let missingDates: string[];
     try {
-      missingDates = await getMissingDates(config, token, startDate, endDate);
+      missingDates = await getMissingDates(
+        config,
+        token,
+        '1/Mar/26',
+        '7/Mar/26'
+      );
     } catch (err: any) {
       if (err.authError) {
-        await updateConfigStatus(config, { status: 'paused_auth', lastRunAt: now.toISOString(), lastRunStatus: 'failed' });
+        await updateConfigStatus(config, {
+          status: 'paused_auth',
+          lastRunAt: now.toISOString(),
+          lastRunStatus: 'failed',
+        });
         await sendEmail(
           config.email,
-          `[Auto Logwork] Action required — ${config.projectName}`,
+          `[Autolog] Action required — ${config.projectName}`,
           buildReauthEmail(config)
         );
       } else {
-        console.error(`Failed to get missing dates for ${config.configId}:`, err);
-        await updateConfigStatus(config, { lastRunAt: now.toISOString(), lastRunStatus: 'failed' });
+        console.error(
+          `Failed to get missing dates for ${config.configId}:`,
+          err
+        );
+        await updateConfigStatus(config, {
+          lastRunAt: now.toISOString(),
+          lastRunStatus: 'failed',
+        });
         await sendEmail(
           config.email,
-          `[Auto Logwork] ${config.projectName} — run failed`,
-          `<html><body><p>Auto logwork failed for <strong>${config.projectName}</strong>.</p><p>Error: ${String(err.message)}</p></body></html>`
+          `[Autolog] ${config.projectName} — run failed`,
+          `<html><body><p>Autolog failed for <strong>${config.projectName}</strong>.</p><p>Error: ${String(err.message)}</p></body></html>`
         );
       }
       continue;
@@ -327,11 +367,14 @@ export const handler = async (): Promise<void> => {
 
     // 4. Nothing to log
     if (missingDates.length === 0) {
-      await updateConfigStatus(config, { lastRunAt: now.toISOString(), lastRunStatus: 'nothing_to_log' });
+      await updateConfigStatus(config, {
+        lastRunAt: now.toISOString(),
+        lastRunStatus: 'nothing_to_log',
+      });
       await sendEmail(
         config.email,
-        `[Auto Logwork] ${config.projectName} — nothing to log`,
-        `<html><body style="font-family:sans-serif"><h2>Auto Logwork — ${config.projectName}</h2><p>Period: <strong>${startDate}</strong> to <strong>${endDate}</strong></p><p>All worklogs are already submitted for this period.</p></body></html>`
+        `[Autolog] ${config.projectName} — nothing to log`,
+        `<html><body style="font-family:sans-serif"><h2>Autolog — ${config.projectName}</h2><p>Period: <strong>${startDate}</strong> to <strong>${endDate}</strong></p><p>All worklogs are already submitted for this period.</p></body></html>`
       );
       continue;
     }
@@ -339,13 +382,22 @@ export const handler = async (): Promise<void> => {
     // 5. Pre-fetch typeOfWork for all tickets
     const typeOfWorkMap = new Map<string, string | undefined>();
     for (const ticket of config.tickets) {
-      const tow = await getTypeOfWork(ticket.issueKey, config.jiraInstance, token);
+      const tow = await getTypeOfWork(
+        ticket.issueKey,
+        config.jiraInstance,
+        token
+      );
       typeOfWorkMap.set(ticket.issueKey, tow);
       await sleep(200);
     }
 
     // 6. Log work for each date × ticket
-    const ticketResults: Array<{ issueKey: string; successCount: number; totalDates: number; hours: number }> = [];
+    const ticketResults: Array<{
+      issueKey: string;
+      successCount: number;
+      totalDates: number;
+      hours: number;
+    }> = [];
     let anyFailure = false;
 
     for (const ticket of config.tickets) {
@@ -353,12 +405,21 @@ export const handler = async (): Promise<void> => {
       const typeOfWork = typeOfWorkMap.get(ticket.issueKey);
 
       for (const date of missingDates) {
-        const result = await logWork(ticket, date, config.username, config.jiraInstance, token, typeOfWork);
+        const result = await logWork(
+          ticket,
+          date,
+          config.username,
+          config.jiraInstance,
+          token,
+          typeOfWork
+        );
         if (result.success) {
           successCount++;
         } else {
           anyFailure = true;
-          console.error(`Failed to log ${ticket.issueKey} on ${date}: ${result.error}`);
+          console.error(
+            `Failed to log ${ticket.issueKey} on ${date}: ${result.error}`
+          );
         }
         await sleep(REQUEST_DELAY_MS);
       }
@@ -378,16 +439,19 @@ export const handler = async (): Promise<void> => {
         : 'failed'
       : 'success';
 
-    await updateConfigStatus(config, { lastRunAt: now.toISOString(), lastRunStatus });
+    await updateConfigStatus(config, {
+      lastRunAt: now.toISOString(),
+      lastRunStatus,
+    });
 
     await sendEmail(
       config.email,
-      `[Auto Logwork] ${config.projectName} — ${startDate} to ${endDate}`,
+      `[Autolog] ${config.projectName} — ${startDate} to ${endDate}`,
       buildSuccessEmail(config, startDate, endDate, missingDates, ticketResults)
     );
 
     console.log(`Completed config ${config.configId}: ${lastRunStatus}`);
   }
 
-  console.log('Auto logwork executor finished');
+  console.log('Autolog executor finished');
 };
