@@ -1,7 +1,6 @@
 import { Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as lambdaNodejs from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as logs from 'aws-cdk-lib/aws-logs';
 import * as apigateway from 'aws-cdk-lib/aws-apigateway';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
@@ -25,6 +24,7 @@ export interface CoreStackProps extends StackProps {
   redirectDomain: string;
   urlifyHostedZoneId: string;
   urlifyCertificateArn: string;
+  fromEmail: string;
 }
 
 export class CoreStack extends Stack {
@@ -70,6 +70,26 @@ export class CoreStack extends Stack {
       process.env.ELEVENSYS_CORE_PATH ??
       path.resolve(__dirname, '../../../elevensys-core');
 
+    const coreAssetExcludes = [
+      'src/**',
+      'tsconfig*.json',
+      '.swcrc',
+      '.env*',
+      '.prettierrc',
+      '.prettierignore',
+      '.barrels.json',
+      'nodemon.json',
+      'processes.config.cjs',
+      'Dockerfile*',
+      'docker-compose.yml',
+      'scripts/**',
+      'test/**',
+      'coverage/**',
+      '.github/**',
+      '*.md',
+      'AGENTS.md',
+    ];
+
     const logGroup = new logs.LogGroup(this, 'CoreLambdaLogGroup', {
       retention: RetentionDays.ONE_MONTH,
     });
@@ -80,25 +100,7 @@ export class CoreStack extends Stack {
       // SWC strips leading paths: src/lambda.ts → dist/lambda.js
       handler: 'dist/lambda.handler',
       code: lambda.Code.fromAsset(ELEVENSYS_CORE_PATH, {
-        exclude: [
-          'src/**',
-          'tsconfig*.json',
-          '.swcrc',
-          '.env*',
-          '.prettierrc',
-          '.prettierignore',
-          '.barrels.json',
-          'nodemon.json',
-          'processes.config.cjs',
-          'Dockerfile*',
-          'docker-compose.yml',
-          'scripts/**',
-          'test/**',
-          'coverage/**',
-          '.github/**',
-          '*.md',
-          'AGENTS.md',
-        ],
+        exclude: coreAssetExcludes,
       }),
       timeout: Duration.seconds(30),
       memorySize: 512,
@@ -110,6 +112,8 @@ export class CoreStack extends Stack {
         URLIFY_BASE_URL: `https://${props.redirectDomain}`,
         OPENAI_API_KEY: openaiApiKey.stringValue,
         AUTOLOG_TABLE_NAME: autologTable.tableName,
+        APP_URL: props.baseApiUrl,
+        FROM_EMAIL: props.fromEmail,
       },
     });
 
@@ -128,6 +132,14 @@ export class CoreStack extends Stack {
         resources: [
           `arn:aws:ssm:${this.region}:${this.account}:parameter/autolog/*`,
         ],
+      })
+    );
+
+    // SES: send autolog notification emails from manual runs
+    coreLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['ses:SendEmail', 'ses:SendRawEmail'],
+        resources: ['*'],
       })
     );
 
@@ -247,27 +259,24 @@ function handler(event) {
       { retention: RetentionDays.ONE_MONTH }
     );
 
-    const executorLambda = new lambdaNodejs.NodejsFunction(
-      this,
-      'AutologExecutorLambda',
-      {
-        runtime: Runtime.NODEJS_20_X,
-        architecture: Architecture.ARM_64,
-        handler: 'handler',
-        entry: path.join(
-          __dirname,
-          '../../resources/lambda/autolog-executor-lambda/index.ts'
-        ),
-        timeout: Duration.minutes(5),
-        memorySize: 256,
-        tracing: Tracing.ACTIVE,
-        logGroup: executorLogGroup,
-        environment: {
-          AUTOLOG_TABLE_NAME: autologTable.tableName,
-          APP_URL: props.baseApiUrl,
-        },
-      }
-    );
+    const executorLambda = new lambda.Function(this, 'AutologExecutorLambda', {
+      runtime: Runtime.NODEJS_20_X,
+      architecture: Architecture.ARM_64,
+      handler: 'dist/autolog-executor.handler',
+      code: lambda.Code.fromAsset(ELEVENSYS_CORE_PATH, {
+        exclude: coreAssetExcludes,
+      }),
+      timeout: Duration.minutes(5),
+      memorySize: 256,
+      tracing: Tracing.ACTIVE,
+      logGroup: executorLogGroup,
+      environment: {
+        NODE_ENV: 'production',
+        AUTOLOG_TABLE_NAME: autologTable.tableName,
+        APP_URL: props.baseApiUrl,
+        FROM_EMAIL: props.fromEmail,
+      },
+    });
 
     autologTable.grantReadWriteData(executorLambda);
 

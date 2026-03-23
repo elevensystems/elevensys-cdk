@@ -26,6 +26,9 @@ const redirectDomain = process.env.REDIRECT_DOMAIN_NAME || '';
 const urlifyHostedZoneId = process.env.API_HOSTED_ZONE_ID || '';
 const urlifyCertificateArn = process.env.URLIFY_CERTIFICATE_ARN || '';
 
+// Email configuration
+const fromEmail = process.env.FROM_EMAIL || 'noreply@elevensys.dev';
+
 // Deploy the Base API Stack first (shared API Gateway)
 const baseApiStack = new BaseApiStack(app, 'BaseApiStack', {
   env,
@@ -42,4 +45,5 @@ new CoreStack(app, 'CoreStack', {
   redirectDomain,
   urlifyHostedZoneId,
   urlifyCertificateArn,
+  fromEmail,
 });
