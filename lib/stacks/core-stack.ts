@@ -151,7 +151,7 @@ export class CoreStack extends Stack {
       proxy: true,
     });
 
-    for (const prefix of ['timesheet', 'openai', 'urlify', 'r']) {
+    for (const prefix of ['timesheet', 'openai', 'urlify']) {
       const resource = props.api.root.addResource(prefix);
       resource.addMethod('ANY', integration);
       resource.addResource('{proxy+}').addMethod('ANY', integration);
@@ -174,18 +174,6 @@ export class CoreStack extends Stack {
         'GET',
         new apigateway.LambdaIntegration(coreLambda, { proxy: true })
       );
-
-    const pathRewriteFn = new cloudfront.Function(this, 'RedirectPathRewrite', {
-      code: cloudfront.FunctionCode.fromInline(`
-function handler(event) {
-  var request = event.request;
-  request.uri = '/r' + request.uri;
-  return request;
-}
-      `),
-      comment:
-        'Prepend /r to redirect-domain requests before forwarding to origin',
-    });
 
     const hostedZone = route53.HostedZone.fromHostedZoneAttributes(
       this,
@@ -215,12 +203,6 @@ function handler(event) {
           cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD,
           viewerProtocolPolicy:
             cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-          functionAssociations: [
-            {
-              function: pathRewriteFn,
-              eventType: cloudfront.FunctionEventType.VIEWER_REQUEST,
-            },
-          ],
           cachePolicy: new cloudfront.CachePolicy(
             this,
             'UrlifyRedirectCachePolicy',
