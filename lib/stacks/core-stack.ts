@@ -1,4 +1,4 @@
-import { Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
+import { BundlingOptions, Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
@@ -17,6 +17,7 @@ import * as ses from 'aws-cdk-lib/aws-ses';
 import { Architecture, Runtime, Tracing } from 'aws-cdk-lib/aws-lambda';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import path from 'path';
+import { execSync } from 'child_process';
 
 export interface CoreStackProps extends StackProps {
   api: apigateway.RestApi;
@@ -79,25 +80,26 @@ export class CoreStack extends Stack {
       process.env.ELEVENSYS_CORE_PATH ??
       path.resolve(__dirname, '../../../elevensys-core');
 
-    const coreAssetExcludes = [
-      'src/**',
-      'tsconfig*.json',
-      '.swcrc',
-      '.env*',
-      '.prettierrc',
-      '.prettierignore',
-      '.barrels.json',
-      'nodemon.json',
-      'processes.config.cjs',
-      'Dockerfile*',
-      'docker-compose.yml',
-      'scripts/**',
-      'test/**',
-      'coverage/**',
-      '.github/**',
-      '*.md',
-      'AGENTS.md',
-    ];
+    // Local bundler: copies pre-built dist/ and installs only production
+    // dependencies via npm (flat node_modules, no pnpm symlinks).
+    // pnpm's .pnpm/ symlink store inflates the zip past Lambda's 250 MB
+    // unzipped limit; npm gives a plain flat layout that zips cleanly.
+    const coreBundling: BundlingOptions = {
+      image: Runtime.NODEJS_20_X.bundlingImage,
+      local: {
+        tryBundle(outputDir: string): boolean {
+          execSync(`cp -r ${ELEVENSYS_CORE_PATH}/dist ${outputDir}/`);
+          execSync(`cp ${ELEVENSYS_CORE_PATH}/package.json ${outputDir}/`);
+
+          // Install prod deps flat via npm (avoids pnpm's .pnpm/ symlink store)
+          execSync('npm install --omit=dev --no-package-lock --legacy-peer-deps', {
+            cwd: outputDir,
+            stdio: ['ignore', 'inherit', 'inherit'],
+          });
+          return true;
+        },
+      },
+    };
 
     const logGroup = new logs.LogGroup(this, 'CoreLambdaLogGroup', {
       retention: RetentionDays.ONE_MONTH,
@@ -109,7 +111,7 @@ export class CoreStack extends Stack {
       // SWC strips leading paths: src/lambda.ts → dist/lambda.js
       handler: 'dist/lambda.handler',
       code: lambda.Code.fromAsset(ELEVENSYS_CORE_PATH, {
-        exclude: coreAssetExcludes,
+        bundling: coreBundling,
       }),
       timeout: Duration.seconds(30),
       memorySize: 512,
@@ -255,7 +257,7 @@ export class CoreStack extends Stack {
       architecture: Architecture.ARM_64,
       handler: 'dist/autolog-executor.handler',
       code: lambda.Code.fromAsset(ELEVENSYS_CORE_PATH, {
-        exclude: coreAssetExcludes,
+        bundling: coreBundling,
       }),
       timeout: Duration.minutes(5),
       memorySize: 256,
