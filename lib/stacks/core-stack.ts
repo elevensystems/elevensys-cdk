@@ -50,10 +50,19 @@ export class CoreStack extends Stack {
 
     const urlifyTable = new dynamodb.Table(this, 'UrlifyTable', {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.DESTROY,
       timeToLiveAttribute: 'TTL',
+    });
+
+    urlifyTable.addGlobalSecondaryIndex({
+      indexName: 'EntityTypeCreatedAtIndex',
+      partitionKey: {
+        name: 'EntityType',
+        type: dynamodb.AttributeType.STRING,
+      },
+      sortKey: { name: 'CreatedAt', type: dynamodb.AttributeType.NUMBER },
+      projectionType: dynamodb.ProjectionType.ALL,
     });
 
     // SSM parameter for OpenAI API key (same path as before)
