@@ -1,4 +1,10 @@
-import { BundlingOptions, Duration, RemovalPolicy, Stack, StackProps } from 'aws-cdk-lib';
+import {
+  BundlingOptions,
+  Duration,
+  RemovalPolicy,
+  Stack,
+  StackProps,
+} from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as logs from 'aws-cdk-lib/aws-logs';
@@ -85,17 +91,20 @@ export class CoreStack extends Stack {
     // pnpm's .pnpm/ symlink store inflates the zip past Lambda's 250 MB
     // unzipped limit; npm gives a plain flat layout that zips cleanly.
     const coreBundling: BundlingOptions = {
-      image: Runtime.NODEJS_20_X.bundlingImage,
+      image: Runtime.NODEJS_22_X.bundlingImage,
       local: {
         tryBundle(outputDir: string): boolean {
           execSync(`cp -r ${ELEVENSYS_CORE_PATH}/dist ${outputDir}/`);
           execSync(`cp ${ELEVENSYS_CORE_PATH}/package.json ${outputDir}/`);
 
           // Install prod deps flat via npm (avoids pnpm's .pnpm/ symlink store)
-          execSync('npm install --omit=dev --no-package-lock --legacy-peer-deps', {
-            cwd: outputDir,
-            stdio: ['ignore', 'inherit', 'inherit'],
-          });
+          execSync(
+            'npm install --omit=dev --no-package-lock --legacy-peer-deps',
+            {
+              cwd: outputDir,
+              stdio: ['ignore', 'inherit', 'inherit'],
+            }
+          );
           return true;
         },
       },
@@ -106,14 +115,14 @@ export class CoreStack extends Stack {
     });
 
     const coreLambda = new lambda.Function(this, 'CoreLambda', {
-      runtime: Runtime.NODEJS_20_X,
+      runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,
       // SWC strips leading paths: src/lambda.ts → dist/lambda.js
       handler: 'dist/lambda.handler',
       code: lambda.Code.fromAsset(ELEVENSYS_CORE_PATH, {
         bundling: coreBundling,
       }),
-      timeout: Duration.seconds(30),
+      timeout: Duration.seconds(35),
       memorySize: 512,
       tracing: Tracing.ACTIVE,
       logGroup,
@@ -253,7 +262,7 @@ export class CoreStack extends Stack {
     );
 
     const executorLambda = new lambda.Function(this, 'AutologExecutorLambda', {
-      runtime: Runtime.NODEJS_20_X,
+      runtime: Runtime.NODEJS_22_X,
       architecture: Architecture.ARM_64,
       handler: 'dist/autolog-executor.handler',
       code: lambda.Code.fromAsset(ELEVENSYS_CORE_PATH, {

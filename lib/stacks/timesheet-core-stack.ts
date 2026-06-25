@@ -43,7 +43,7 @@ export interface TimesheetCoreStackProps extends StackProps {
 /** Shared Lambda defaults for all functions in this stack */
 const LAMBDA_DEFAULTS = {
   handler: 'handler' as const,
-  runtime: Runtime.NODEJS_20_X,
+  runtime: Runtime.NODEJS_22_X,
   architecture: Architecture.ARM_64,
   tracing: Tracing.ACTIVE,
   memorySize: 256,
@@ -131,8 +131,9 @@ export class TimesheetCoreStack extends Stack {
       .addMethod('POST', proxyIntegration);
 
     // POST /timesheet/project-worklogs-report/get-all
-    const projectWorklogsReportResource =
-      timesheetResource.addResource('project-worklogs-report');
+    const projectWorklogsReportResource = timesheetResource.addResource(
+      'project-worklogs-report'
+    );
     projectWorklogsReportResource
       .addResource('get-all')
       .addMethod('POST', proxyIntegration);
