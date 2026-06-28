@@ -32,6 +32,9 @@ export interface CoreStackProps extends StackProps {
   urlifyHostedZoneId: string;
   urlifyCertificateArn: string;
   fromEmail: string;
+  classifyPrompts?: string;
+  capturePrompts?: string;
+  captureBashRaw?: string;
 }
 
 export class CoreStack extends Stack {
@@ -72,11 +75,53 @@ export class CoreStack extends Stack {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
+    // =========================================================================
+    // Claude Code usage tracking — single-table design (raw events + rollups)
+    // RETAIN so analytics history survives a stack teardown. Only dedup markers
+    // and raw events set the `TTL` attribute; rollups are kept indefinitely.
+    // =========================================================================
+    const claudeWatchTable = new dynamodb.Table(this, 'ClaudeWatchTable', {
+      partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: RemovalPolicy.RETAIN,
+      timeToLiveAttribute: 'TTL',
+    });
+
+    // GSI1 — by-date listing: dev/proj/dev×model/dev×tool rollups + global sessions
+    claudeWatchTable.addGlobalSecondaryIndex({
+      indexName: 'GSI1',
+      partitionKey: { name: 'GSI1PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'GSI1SK', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    // GSI2 — sessions by developer
+    claudeWatchTable.addGlobalSecondaryIndex({
+      indexName: 'GSI2',
+      partitionKey: { name: 'GSI2PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'GSI2SK', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+    // GSI3 — sessions by project
+    claudeWatchTable.addGlobalSecondaryIndex({
+      indexName: 'GSI3',
+      partitionKey: { name: 'GSI3PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'GSI3SK', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
     // SSM parameter for OpenAI API key (same path as before)
     const openaiApiKey = ssm.StringParameter.fromStringParameterName(
       this,
       'OpenAIApiKey',
       '/openai/api-key'
+    );
+
+    // SSM parameter for Anthropic API key (prompt-intent classification)
+    const anthropicApiKey = ssm.StringParameter.fromStringParameterName(
+      this,
+      'AnthropicApiKey',
+      '/anthropic/api-key'
     );
 
     // Path to pre-built elevensys-core (sibling repo).
@@ -132,6 +177,11 @@ export class CoreStack extends Stack {
         URLIFY_BASE_URL: `https://${props.redirectDomain}`,
         OPENAI_API_KEY: openaiApiKey.stringValue,
         AUTOLOG_TABLE_NAME: autologTable.tableName,
+        CLAUDE_WATCH_TABLE_NAME: claudeWatchTable.tableName,
+        ANTHROPIC_API_KEY: anthropicApiKey.stringValue,
+        CLASSIFY_PROMPTS: props.classifyPrompts ?? '1',
+        CAPTURE_PROMPTS: props.capturePrompts ?? '1',
+        CAPTURE_BASH_RAW: props.captureBashRaw ?? '0',
         APP_URL: props.baseApiUrl,
         FROM_EMAIL: props.fromEmail,
       },
@@ -139,7 +189,9 @@ export class CoreStack extends Stack {
 
     urlifyTable.grantReadWriteData(coreLambda);
     openaiApiKey.grantRead(coreLambda);
+    anthropicApiKey.grantRead(coreLambda);
     autologTable.grantReadWriteData(coreLambda);
+    claudeWatchTable.grantReadWriteData(coreLambda);
 
     // Allow coreLambda to read/write SSM parameters for autolog tokens
     coreLambda.addToRolePolicy(
@@ -171,7 +223,7 @@ export class CoreStack extends Stack {
       proxy: true,
     });
 
-    for (const prefix of ['jira', 'openai', 'urlify']) {
+    for (const prefix of ['jira', 'openai', 'urlify', 'claude-watch']) {
       const resource = props.api.root.addResource(prefix);
       resource.addMethod('ANY', integration);
       resource.addResource('{proxy+}').addMethod('ANY', integration);

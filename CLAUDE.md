@@ -156,6 +156,14 @@ All proxy endpoints accept `?jiraInstance=jiradc|jira3|jira9` query parameter.
 - **Endpoint:** `POST /openai`
 - API key stored in SSM Parameter Store (`/openai/api-key`)
 
+### Claude Watch (in CoreStack)
+
+- **Routes:** `api.elevensys.dev/claude-watch/*` (added to the CoreLambda proxy prefix loop)
+- **Table:** `ClaudeWatchTable` construct in `core-stack.ts`, single-table
+  design (`PK`/`SK`), on-demand billing, `removalPolicy: RETAIN` (analytics history), TTL attribute `TTL`
+- **GSIs:** `GSI1` (by-date rollups + global sessions), `GSI2` (sessions by developer), `GSI3` (sessions by project)
+- Env var `CLAUDE_WATCH_TABLE_NAME` injected into CoreLambda; `grantReadWriteData(coreLambda)`
+
 ## Lambda Development
 
 ### Standard Pattern
