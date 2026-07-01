@@ -6,7 +6,7 @@
 
 - **Jira Timesheet Integration** - Proxy to Jira APIs for worklog management
 - **URL Shortener (Urlify)** - URL shortening with click tracking and custom domain
-- **OpenAI API Wrapper** - Proxied access to OpenAI's API
+- **OpenAI API Wrapper** - Proxied access to OpenAI's API (served by `CoreStack` via elevensys-core; the standalone stack was removed)
 
 All services share a common API Gateway at `api.elevensys.dev`.
 
@@ -17,7 +17,6 @@ All services share a common API Gateway at `api.elevensys.dev`.
 - **Node.js 20.x** - Runtime (Lambda functions)
 - **AWS SDK v3** - DynamoDB, SQS, SSM clients (`^3.868.0`)
 - **axios ^1.11.0** - HTTP client for Jira API proxy
-- **openai ^6.16.0** - OpenAI SDK
 - **uuid ^11.0.3** - UUID generation
 - **Jest 29.7.0** - Testing framework
 
@@ -38,14 +37,13 @@ elevensys-cdk/
 │   └── elevensys-cdk.ts         # Main application - stack orchestration
 ├── lib/
 │   └── stacks/                  # CDK stack definitions
-│       ├── base-api-stack.ts    # Shared API Gateway (api.elevensys.dev)
-│       ├── openai-stack.ts      # OpenAI API integration
+│       ├── base-api-stack.ts    # Shared API Gateway (api.elevensystems.dev)
+│       ├── core-stack.ts        # elevensys-core Lambda (serves /jira, /openai, /urlify + autolog)
 │       ├── timesheet-core-stack.ts # Jira timesheet proxy + legacy processing
 │       └── urlify-stack.ts      # URL shortener service
 ├── resources/
 │   ├── lambda/                  # Lambda function implementations
 │   │   ├── timesheet-proxy-lambda/   # Jira API proxy
-│   │   ├── openai-lambda/            # OpenAI API proxy
 │   │   ├── urlify-lambda/            # URL redirect handler
 │   │   └── urlify-admin-lambda/      # URL management API
 │   └── shared/                  # Shared code across lambdas
@@ -151,10 +149,13 @@ All proxy endpoints accept `?jiraInstance=jiradc|jira3|jira9` query parameter.
 - 6-character random short codes
 - CloudFront caching for redirects
 
-### OpenAIStack
+### OpenAI (`POST /openai`)
 
-- **Endpoint:** `POST /openai`
-- API key stored in SSM Parameter Store (`/openai/api-key`)
+- Served by **CoreStack** (the elevensys-core Lambda), not a standalone stack.
+  The old `OpenAIStack` + `openai-lambda` were removed; `CoreStack` routes
+  `/openai` to elevensys-core's `openai.controller`.
+- API key stored in SSM Parameter Store (`/openai/api-key`), read by `CoreStack`
+  and injected as `OPENAI_API_KEY`.
 
 ### Claude Watch (in CoreStack)
 

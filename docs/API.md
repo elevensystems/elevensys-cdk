@@ -33,12 +33,12 @@ All endpoints accept optional query parameter `?jiraInstance=jiradc|jira3|jira9`
 
 ## OpenAI
 
-**Stack:** OpenAIStack
-**Handler:** `openai-lambda`
+**Stack:** CoreStack
+**Handler:** elevensys-core `openai.controller` (via the shared `CoreLambda`)
 
-| Method | Path      | Parameters                                                                                          | Description                                                    |
-| ------ | --------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `POST` | `/openai` | Body: `{input (required), model?, instructions?, temperature?, max_output_tokens?, tools?, store?}` | OpenAI chat completions proxy. Model defaults to `gpt-5-nano`. |
+| Method | Path      | Parameters                                                                                          | Description                                                            |
+| ------ | --------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `POST` | `/openai` | Body: `{input (required), model?, instructions?, temperature?, max_output_tokens?, tools?, store?}` | OpenAI Responses API proxy. Model defaults to `gpt-5-nano`. |
 
 ---
 
