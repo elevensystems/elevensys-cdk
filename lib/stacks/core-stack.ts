@@ -232,7 +232,13 @@ export class CoreStack extends Stack {
       proxy: true,
     });
 
-    for (const prefix of ['jira', 'openai', 'urlify', 'claude-watch', 'logs']) {
+    for (const prefix of [
+      'jira',
+      'openai',
+      'urlify',
+      'claude-watch',
+      'audit',
+    ]) {
       const resource = props.api.root.addResource(prefix);
       resource.addMethod('ANY', integration);
       resource.addResource('{proxy+}').addMethod('ANY', integration);

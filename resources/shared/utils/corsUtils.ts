@@ -9,9 +9,7 @@ const ALLOWED_ORIGINS: string[] = [
  * Resolves the allowed origin from the request's Origin header.
  * Returns the origin if it matches the allowlist, otherwise undefined.
  */
-function resolveOrigin(
-  event: APIGatewayProxyEvent
-): string | undefined {
+function resolveOrigin(event: APIGatewayProxyEvent): string | undefined {
   const origin = event.headers?.origin || event.headers?.Origin || '';
   return ALLOWED_ORIGINS.includes(origin) ? origin : undefined;
 }
