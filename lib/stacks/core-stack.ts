@@ -182,6 +182,7 @@ export class CoreStack extends Stack {
         CLASSIFY_PROMPTS: props.classifyPrompts ?? '1',
         CAPTURE_PROMPTS: props.capturePrompts ?? '1',
         CAPTURE_BASH_RAW: props.captureBashRaw ?? '0',
+        CLOUDWATCH_LOG_GROUP: logGroup.logGroupName,
         APP_URL: props.baseApiUrl,
         FROM_EMAIL: props.fromEmail,
       },
@@ -207,6 +208,14 @@ export class CoreStack extends Stack {
       })
     );
 
+    // CloudWatch Logs Insights: allow coreLambda to query its own log group
+    coreLambda.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['logs:StartQuery', 'logs:GetQueryResults', 'logs:StopQuery'],
+        resources: [logGroup.logGroupArn],
+      })
+    );
+
     // SES: send autolog notification emails from manual runs
     coreLambda.addToRolePolicy(
       new iam.PolicyStatement({
@@ -223,7 +232,7 @@ export class CoreStack extends Stack {
       proxy: true,
     });
 
-    for (const prefix of ['jira', 'openai', 'urlify', 'claude-watch']) {
+    for (const prefix of ['jira', 'openai', 'urlify', 'claude-watch', 'logs']) {
       const resource = props.api.root.addResource(prefix);
       resource.addMethod('ANY', integration);
       resource.addResource('{proxy+}').addMethod('ANY', integration);
