@@ -124,6 +124,24 @@ export class CoreStack extends Stack {
       '/anthropic/api-key'
     );
 
+    // SSM parameters for Cognito access-token verification (admin + insight
+    // share one user pool) and the claude-watch machine-ingest API key.
+    const cognitoUserPoolId = ssm.StringParameter.fromStringParameterName(
+      this,
+      'CognitoUserPoolId',
+      '/cognito/user-pool-id'
+    );
+    const cognitoClientIds = ssm.StringParameter.fromStringParameterName(
+      this,
+      'CognitoClientIds',
+      '/cognito/client-ids'
+    );
+    const claudeWatchApiKey = ssm.StringParameter.fromStringParameterName(
+      this,
+      'ClaudeWatchApiKey',
+      '/claude-watch/api-key'
+    );
+
     // Path to pre-built elevensys-core (sibling repo).
     // In CI, both repos are checked out as siblings under github.workspace,
     // so the relative path resolves correctly without any env override.
@@ -185,12 +203,21 @@ export class CoreStack extends Stack {
         CLOUDWATCH_LOG_GROUP: logGroup.logGroupName,
         APP_URL: props.baseApiUrl,
         FROM_EMAIL: props.fromEmail,
+        COGNITO_USER_POOL_ID: cognitoUserPoolId.stringValue,
+        COGNITO_CLIENT_IDS: cognitoClientIds.stringValue,
+        CLAUDE_WATCH_API_KEY: claudeWatchApiKey.stringValue,
+        CORS_ALLOWED_ORIGINS: [
+          'https://www.elevensystems.dev',
+          'https://admin.elevensystems.dev',
+          'https://insight.elevensystems.dev',
+        ].join(','),
       },
     });
 
     urlifyTable.grantReadWriteData(coreLambda);
     openaiApiKey.grantRead(coreLambda);
     anthropicApiKey.grantRead(coreLambda);
+    claudeWatchApiKey.grantRead(coreLambda);
     autologTable.grantReadWriteData(coreLambda);
     claudeWatchTable.grantReadWriteData(coreLambda);
 
