@@ -6,8 +6,8 @@ Base domain: `https://api.elevensys.dev`
 
 ## Timesheet Proxy
 
-**Stack:** TimesheetCoreStack
-**Handler:** `timesheet-proxy-lambda`
+**Stack:** CoreStack
+**Handler:** elevensys-core (via the shared `CoreLambda`)
 
 All endpoints require `Authorization: Bearer <token>` header.
 All endpoints accept optional query parameter `?jiraInstance=jiradc|jira3|jira9` (defaults to `jiradc`).
@@ -44,8 +44,8 @@ All endpoints accept optional query parameter `?jiraInstance=jiradc|jira3|jira9`
 
 ## Urlify - Admin API
 
-**Stack:** UrlifyStack
-**Handler:** `urlify-admin-lambda`
+**Stack:** CoreStack
+**Handler:** elevensys-core (via the shared `CoreLambda`)
 
 | Method   | Path                        | Parameters                                                          | Description                          |
 | -------- | --------------------------- | ------------------------------------------------------------------- | ------------------------------------ |
@@ -59,8 +59,9 @@ All endpoints accept optional query parameter `?jiraInstance=jiradc|jira3|jira9`
 
 ## Urlify - Redirect
 
+**Stack:** CoreStack
 **Domain:** `https://urlify.cc`
-**Handler:** `urlify-lambda`
+**Handler:** elevensys-core (via the shared `CoreLambda`)
 
 | Method | Path           | Description                                                                         |
 | ------ | -------------- | ----------------------------------------------------------------------------------- |
