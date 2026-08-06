@@ -6,8 +6,8 @@ Base domain: `https://api.elevensys.dev`
 
 ## Timesheet Proxy
 
-**Stack:** TimesheetCoreStack
-**Handler:** `timesheet-proxy-lambda`
+**Stack:** CoreStack
+**Handler:** elevensys-core (via the shared `CoreLambda`)
 
 All endpoints require `Authorization: Bearer <token>` header.
 All endpoints accept optional query parameter `?jiraInstance=jiradc|jira3|jira9` (defaults to `jiradc`).
@@ -33,19 +33,19 @@ All endpoints accept optional query parameter `?jiraInstance=jiradc|jira3|jira9`
 
 ## OpenAI
 
-**Stack:** OpenAIStack
-**Handler:** `openai-lambda`
+**Stack:** CoreStack
+**Handler:** elevensys-core `openai.controller` (via the shared `CoreLambda`)
 
-| Method | Path      | Parameters                                                                                          | Description                                                    |
-| ------ | --------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `POST` | `/openai` | Body: `{input (required), model?, instructions?, temperature?, max_output_tokens?, tools?, store?}` | OpenAI chat completions proxy. Model defaults to `gpt-5-nano`. |
+| Method | Path      | Parameters                                                                                          | Description                                                            |
+| ------ | --------- | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `POST` | `/openai` | Body: `{input (required), model?, instructions?, temperature?, max_output_tokens?, tools?, store?}` | OpenAI Responses API proxy. Model defaults to `gpt-5-nano`. |
 
 ---
 
 ## Urlify - Admin API
 
-**Stack:** UrlifyStack
-**Handler:** `urlify-admin-lambda`
+**Stack:** CoreStack
+**Handler:** elevensys-core (via the shared `CoreLambda`)
 
 | Method   | Path                        | Parameters                                                          | Description                          |
 | -------- | --------------------------- | ------------------------------------------------------------------- | ------------------------------------ |
@@ -59,8 +59,9 @@ All endpoints accept optional query parameter `?jiraInstance=jiradc|jira3|jira9`
 
 ## Urlify - Redirect
 
+**Stack:** CoreStack
 **Domain:** `https://urlify.cc`
-**Handler:** `urlify-lambda`
+**Handler:** elevensys-core (via the shared `CoreLambda`)
 
 | Method | Path           | Description                                                                         |
 | ------ | -------------- | ----------------------------------------------------------------------------------- |

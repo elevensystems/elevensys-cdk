@@ -18,17 +18,14 @@
     "@aws-sdk/client-ssm": "^3.864.0",
     "@aws-sdk/lib-dynamodb": "^3.868.0",
     "aws-cdk-lib": "2.219.0",
-    "axios": "^1.13.5",
     "constructs": "^10.0.0",
     "dotenv": "^17.2.1",
-    "openai": "^6.16.0",
     "uuid": "^11.0.3"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.4.1",
     "@commitlint/config-conventional": "^20.4.1",
     "@types/aws-lambda": "^8.10.152",
-    "@types/axios": "^0.9.36",
     "@types/jest": "^29.5.14",
     "@types/node": "22.7.9",
     "@types/uuid": "^10.0.0",

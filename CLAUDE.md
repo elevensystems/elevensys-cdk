@@ -2,23 +2,22 @@
 
 ## Project Overview
 
-**elevensys-cdk** is an AWS CDK infrastructure-as-code project written in TypeScript. It deploys a microservices platform with multiple integrated services:
+**elevensys-cdk** is an AWS CDK infrastructure-as-code project written in TypeScript. This repo only defines two stacks — `BaseApiStack` (the shared API Gateway) and `CoreStack` (a single Lambda, `CoreLambda`, that proxies every service route). All actual request-handling logic lives in the external sibling repo **elevensys-core**, which `CoreStack` pulls in as a pre-built Lambda asset (see `ELEVENSYS_CORE_PATH` in `core-stack.ts`). `CoreStack` fronts:
 
-- **Jira Timesheet Integration** - Proxy to Jira APIs for worklog management
-- **URL Shortener (Urlify)** - URL shortening with click tracking and custom domain
-- **OpenAI API Wrapper** - Proxied access to OpenAI's API
+- **Jira Timesheet Integration** - `/jira/*` proxy to Jira APIs for worklog management
+- **URL Shortener (Urlify)** - `/urlify/*` admin API plus the `urlify.cc` redirect domain
+- **OpenAI API Wrapper** - `/openai` proxied access to OpenAI's API
+- **Claude Watch** - `/claude-watch/*` analytics
+- **Audit** - `/audit/*`
 
-All services share a common API Gateway at `api.elevensys.dev`.
+All routes share the common API Gateway at `api.elevensys.dev`. There used to be standalone `TimesheetCoreStack`, `UrlifyStack`, and `OpenAIStack` constructs with their own Lambdas under `resources/lambda/` in this repo — they were removed once `CoreStack`/elevensys-core took over all routing. Any change to service behavior now happens in the `elevensys-core` repo, not here.
 
 ## Tech Stack
 
 - **AWS CDK** - `aws-cdk-lib` 2.219.0 / `aws-cdk` CLI 2.1030.0
 - **TypeScript 5.6.3** - Primary language
-- **Node.js 20.x** - Runtime (Lambda functions)
+- **Node.js 22.x** - Runtime (`CoreLambda`, `AutologExecutorLambda`)
 - **AWS SDK v3** - DynamoDB, SQS, SSM clients (`^3.868.0`)
-- **axios ^1.11.0** - HTTP client for Jira API proxy
-- **openai ^6.16.0** - OpenAI SDK
-- **uuid ^11.0.3** - UUID generation
 - **Jest 29.7.0** - Testing framework
 
 ## Directory Structure
@@ -39,32 +38,14 @@ elevensys-cdk/
 ├── lib/
 │   └── stacks/                  # CDK stack definitions
 │       ├── base-api-stack.ts    # Shared API Gateway (api.elevensys.dev)
-│       ├── openai-stack.ts      # OpenAI API integration
-│       ├── timesheet-core-stack.ts # Jira timesheet proxy + legacy processing
-│       └── urlify-stack.ts      # URL shortener service
-├── resources/
-│   ├── lambda/                  # Lambda function implementations
-│   │   ├── timesheet-proxy-lambda/   # Jira API proxy
-│   │   ├── openai-lambda/            # OpenAI API proxy
-│   │   ├── urlify-lambda/            # URL redirect handler
-│   │   └── urlify-admin-lambda/      # URL management API
-│   └── shared/                  # Shared code across lambdas
-│       ├── constants/           # Shared constants
-│       ├── models/              # TypeScript interfaces
-│       │   ├── types.ts         # Core types (JiraInstance)
-│       │   └── urlShortenerTypes.ts # UrlData interface
-│       ├── services/            # AWS service wrappers
-│       │   ├── dynamoDbClient.ts # DynamoDBService class
-│       │   └── ssmClient.ts     # SsmService class
-│       └── utils/               # Helper functions
-│           ├── responseUtils.ts # Standardized API responses
-│           ├── httpUtils.ts     # HTTP client with retry, Jira headers, parseBodyToJson
-│           └── dateUtils.ts     # getCurrentTime, parseDates
+│       └── core-stack.ts        # CoreLambda (serves /jira, /openai, /urlify, /claude-watch, /audit + autolog)
 ├── test/                        # Jest unit tests
 ├── docs/                        # Documentation (API.md - full API reference)
 ├── scripts/                     # Scripts (placeholder)
-└── .github/workflows/           # CI/CD (deploy.yml)
+└── .github/workflows/           # CI/CD (deploy.yml, checks out elevensys-core as a sibling dir)
 ```
+
+> Note: there is no `resources/` directory in this repo. `CoreStack` loads its Lambda code from the sibling `elevensys-core` repository (resolved via `ELEVENSYS_CORE_PATH`, default `../../../elevensys-core`), not from local source — see `core-stack.ts`.
 
 ## Common Commands
 
@@ -118,127 +99,53 @@ npx cdk destroy            # Destroy stacks
 - All other stacks attach their resources to this API
 - Handles SSL certificate and Route53 DNS
 
-### TimesheetCoreStack
+### CoreStack
 
-- Single `timesheet-proxy-lambda` handles all Jira API routes
-- Routes requests to Jira REST API based on HTTP method and path
-- Requires `Authorization` header (Bearer token) forwarded to Jira
+A single `CoreLambda` (code from the external `elevensys-core` repo) is proxied
+onto the shared API Gateway for every service prefix — `jira`, `openai`,
+`urlify`, `claude-watch`, `audit` — via `ANY /{prefix}` and
+`ANY /{prefix}/{proxy+}`. All request routing, auth, and business logic
+happens inside elevensys-core's own app, not in this CDK repo. There used to
+be standalone `TimesheetCoreStack` and `UrlifyStack` constructs with their own
+Lambdas (`timesheet-proxy-lambda`, `urlify-lambda`, `urlify-admin-lambda`) —
+both were removed once `CoreStack` absorbed their routing. See `docs/API.md`
+for the endpoint reference (kept for historical/consumer documentation, actual
+implementation lives in elevensys-core).
 
-**Proxy Endpoints:**
-| Method | Path | Description |
-|--------|------|-------------|
-| `GET` | `/timesheet/auth` | Check authentication with Jira |
-| `GET` | `/timesheet/worklogs` | Fetch user worklogs |
-| `GET` | `/timesheet/project-worklogs` | Fetch project worklogs |
-| `GET` | `/timesheet/project-worklogs/pagination` | Paginated project worklogs |
-| `DELETE` | `/timesheet/project-worklogs/{issueId}/{timesheetId}` | Delete timesheet entry |
-| `GET` | `/timesheet/timesheet-view` | Fetch timesheet calendar view |
-| `GET` | `/timesheet/timesheet-dates` | Fetch timesheet dates |
-| `POST` | `/timesheet/logwork` | Log work entry to Jira |
-| `POST` | `/timesheet/project-worklogs-warning` | Project worklogs warning report |
-| `GET` | `/timesheet/projects` | Fetch all Jira projects |
-| `GET` | `/timesheet/projects/{projectId}` | Fetch a specific Jira project |
-| `POST` | `/timesheet/projects` | Fetch issues using JQL payload |
-| `GET` | `/timesheet/projects/{projectId}/issues` | Fetch issues for a project |
-| `GET` | `/timesheet/issue/{issueId}` | Fetch a specific Jira issue |
-
-All proxy endpoints accept `?jiraInstance=jiradc|jira3|jira9` query parameter.
-
-### UrlifyStack
-
-- **Admin API:** `api.elevensys.dev/urlify/*`
-- **Redirect Domain:** `urlify.cc/{shortCode}`
-- 6-character random short codes
-- CloudFront caching for redirects
-
-### OpenAIStack
-
-- **Endpoint:** `POST /openai`
-- API key stored in SSM Parameter Store (`/openai/api-key`)
+- **Jira Timesheet** (`/jira/*`) — proxy to Jira REST API; requires
+  `Authorization: Bearer <token>` forwarded to Jira, `?jiraInstance=jiradc|jira3|jira9`
+- **Urlify** (`/urlify/*` admin API + `urlify.cc/{shortCode}` redirect) — 6-character
+  short codes, `UrlifyTable` DynamoDB table (GSI `EntityTypeCreatedAtIndex`), CloudFront
+  caching for redirects via a dedicated `UrlifyRedirectApi` + `UrlifyRedirectDistribution`
+- **OpenAI** (`POST /openai`) — API key stored in SSM Parameter Store
+  (`/openai/api-key`), read by `CoreStack` and injected as `OPENAI_API_KEY`
+- **Claude Watch** (`/claude-watch/*`) — `ClaudeWatchTable` construct in
+  `core-stack.ts`, single-table design (`PK`/`SK`), on-demand billing,
+  `removalPolicy: RETAIN` (analytics history), TTL attribute `TTL`.
+  GSIs: `GSI1` (by-date rollups + global sessions), `GSI2` (sessions by
+  developer), `GSI3` (sessions by project). Env var
+  `CLAUDE_WATCH_TABLE_NAME` injected into CoreLambda;
+  `grantReadWriteData(coreLambda)`
+- **Audit** (`/audit/*`)
+- **Autolog** — `AutologExecutorLambda` (also code from `elevensys-core`),
+  triggered hourly via EventBridge (`AutologHourlyRule`), not exposed as an
+  HTTP route. Uses `AutologTable` and SSM params under `/autolog/*`.
 
 ## Lambda Development
 
-### Standard Pattern
+There is no Lambda handler source in this repo. `CoreLambda` and
+`AutologExecutorLambda` (defined in `lib/stacks/core-stack.ts`) both load
+their compiled code from the external `elevensys-core` repo via
+`lambda.Code.fromAsset(ELEVENSYS_CORE_PATH, ...)`. Handler code, request
+routing, response utilities, HTTP clients, and DynamoDB/SSM service wrappers
+all live in `elevensys-core`, not here — go there to change Lambda behavior.
 
-All Lambda handlers follow this structure:
+### Lambda Configuration Defaults (in `core-stack.ts`)
 
-```typescript
-import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
-
-export const handler = async (
-  event: APIGatewayProxyEvent
-): Promise<APIGatewayProxyResult> => {
-  // Implementation
-};
-```
-
-### Response Utilities
-
-Use standardized responses from `resources/shared/utils/responseUtils.ts`:
-
-```typescript
-import { success, created, badRequest, serverError } from '../shared/utils/responseUtils';
-
-// Returns 200 with data
-return success({ data: result });
-
-// Returns 400 for validation errors
-return badRequest('Invalid input');
-
-// Returns 500 for server errors
-return serverError('Something went wrong');
-```
-
-### HTTP Utilities
-
-From `resources/shared/utils/httpUtils.ts`:
-
-```typescript
-import { sendRequest, createJiraHeaders, parseBodyToJson, sleep } from '../shared/utils/httpUtils';
-
-// POST with exponential backoff retry (handles 429 and 5xx)
-const response = await sendRequest(url, payload, headers, maxRetries);
-
-// Build Jira auth headers from Bearer token
-const headers = createJiraHeaders(token, 'jiradc');
-
-// Safely parse JSON body
-const body = parseBodyToJson<MyType>(event.body);
-```
-
-### Lambda Configuration Defaults
-
-- **Runtime:** Node.js 20.x (NODEJS_LATEST)
+- **Runtime:** Node.js 22.x (`Runtime.NODEJS_22_X`)
 - **Architecture:** ARM64 (cost optimized)
-- **Memory:** 256MB default
-- **Timeout:** 30s for proxy
 - **Tracing:** X-Ray active
-- **Log Retention:** 1 month
-
-## Shared Services
-
-### DynamoDBService (`resources/shared/services/dynamoDbClient.ts`)
-
-```typescript
-import dynamoDBService from '../shared/services/dynamoDbClient';
-
-// Default instance (no config)
-await dynamoDBService.putItem('TableName', item);
-await dynamoDBService.getItem('TableName', { pk: 'value' });
-await dynamoDBService.queryItems('TableName', params);
-await dynamoDBService.scanItems('TableName');
-await dynamoDBService.deleteItem('TableName', { pk: 'value' });
-
-// Custom instance
-const custom = new DynamoDBService({ region: 'us-west-2' });
-```
-
-### SsmService (`resources/shared/services/ssmClient.ts`)
-
-```typescript
-const ssm = new SsmService();
-const value = await ssm.getParameterValue('/path/to/param');
-```
+- **Log Retention:** 1 month (dedicated log groups per Lambda)
 
 ## Environment Variables
 
@@ -282,9 +189,9 @@ GitHub Actions workflow (`.github/workflows/deploy.yml`):
 
 ## Key Design Patterns
 
-1. **Microservices Architecture** - Independent stacks sharing base API
-2. **API Proxy** - Single Lambda routing to external Jira APIs
-3. **Exponential Backoff** - Retry logic with jitter for external API calls
+1. **Two-stack architecture** - `BaseApiStack` (shared API Gateway) + `CoreStack` (single proxy Lambda), all business logic delegated to the external `elevensys-core` repo
+2. **API Proxy** - `CoreLambda` handles every service prefix (`jira`, `openai`, `urlify`, `claude-watch`, `audit`) via `ANY {proxy+}` integrations
+3. **Asset-based deployment** - `CoreStack` bundles `elevensys-core`'s pre-built `dist/` output directly (`lambda.Code.fromAsset`), no local `NodejsFunction` bundling
 
 ## Important Files to Understand
 
@@ -292,46 +199,32 @@ GitHub Actions workflow (`.github/workflows/deploy.yml`):
 |------|---------|
 | `bin/elevensys-cdk.ts` | Stack instantiation and dependencies |
 | `lib/stacks/base-api-stack.ts` | Shared API Gateway configuration |
-| `lib/stacks/timesheet-core-stack.ts` | Timesheet proxy architecture |
-| `resources/lambda/timesheet-proxy-lambda/index.ts` | Route-based Jira API proxy |
-| `resources/shared/utils/responseUtils.ts` | Standardized API responses |
-| `resources/shared/utils/httpUtils.ts` | HTTP client with retry logic + Jira headers |
-| `resources/shared/models/types.ts` | Core TypeScript interfaces |
+| `lib/stacks/core-stack.ts` | CoreLambda/AutologExecutorLambda, DynamoDB tables, all API routes, urlify.cc redirect |
 | `docs/API.md` | Full API reference with all endpoints |
+| `../elevensys-core` (sibling repo) | Actual Lambda handler code, routing, and business logic |
 
 ## Common Tasks
 
-### Adding a New Lambda
+### Adding a New API Endpoint / Changing Service Behavior
 
-1. Create folder in `resources/lambda/<name>-lambda/`
-2. Add `index.ts` with handler function
-3. Add Lambda construct in appropriate stack
-4. Import shared utilities as needed
-
-### Adding a New API Endpoint
-
-1. Add Lambda function (see above)
-2. In stack file, add resource and method to API Gateway
-3. Use `api.root.addResource('path')` and `.addMethod('GET', lambdaIntegration)`
-
-### Adding a New Proxy Route
-
-1. Add route config to `ROUTES` record in `timesheet-proxy-lambda/index.ts`
-2. Define method, required params, and `buildUrl` function
-3. Add corresponding API Gateway resource/method in `timesheet-core-stack.ts`
+New endpoints and routing logic are added in the external `elevensys-core`
+repo, not here. In this repo you only need to touch `core-stack.ts` if you're
+adding a brand-new top-level route prefix (extend the proxy-prefix loop) or a
+new AWS resource (table, permission, env var) that `CoreLambda` needs.
 
 ### Modifying DynamoDB Schema
 
-1. Update type definitions in `resources/shared/models/`
-2. Modify stack if table structure changes
+1. Update the table construct (`UrlifyTable`, `AutologTable`, `ClaudeWatchTable`) in `lib/stacks/core-stack.ts` if key/GSI structure changes
+2. Update the corresponding type definitions in `elevensys-core`
 3. Consider migration strategy for existing data
 
 ## Troubleshooting
 
 - **CDK Deploy Fails:** Check AWS credentials and `.env` configuration
 - **Lambda Timeout:** Check memory allocation and external API calls
-- **CORS Issues:** Verify CORS headers in responseUtils and API Gateway config
+- **CORS Issues:** Verify CORS headers in elevensys-core's response utilities and API Gateway config
 - **SSL Errors:** Ensure certificate is in correct region (us-east-1 for CloudFront)
+- **Lambda Code Not Updating:** Ensure `elevensys-core` is checked out as a sibling directory (or `ELEVENSYS_CORE_PATH` is set) and built (`npm run build`) before `cdk deploy`/`cdk synth`
 
 ## Claude Code Configuration
 
