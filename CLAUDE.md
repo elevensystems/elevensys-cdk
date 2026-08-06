@@ -7,7 +7,6 @@
 - **Jira Timesheet Integration** - `/jira/*` proxy to Jira APIs for worklog management
 - **URL Shortener (Urlify)** - `/urlify/*` admin API plus the `urlify.cc` redirect domain
 - **OpenAI API Wrapper** - `/openai` proxied access to OpenAI's API
-- **Claude Watch** - `/claude-watch/*` analytics
 - **Audit** - `/audit/*`
 
 All routes share the common API Gateway at `api.elevensys.dev`. There used to be standalone `TimesheetCoreStack`, `UrlifyStack`, and `OpenAIStack` constructs with their own Lambdas under `resources/lambda/` in this repo — they were removed once `CoreStack`/elevensys-core took over all routing. Any change to service behavior now happens in the `elevensys-core` repo, not here.
@@ -38,7 +37,7 @@ elevensys-cdk/
 ├── lib/
 │   └── stacks/                  # CDK stack definitions
 │       ├── base-api-stack.ts    # Shared API Gateway (api.elevensys.dev)
-│       └── core-stack.ts        # CoreLambda (serves /jira, /openai, /urlify, /claude-watch, /audit + autolog)
+│       └── core-stack.ts        # CoreLambda (serves /jira, /openai, /urlify, /audit + autolog)
 ├── test/                        # Jest unit tests
 ├── docs/                        # Documentation (API.md - full API reference)
 ├── scripts/                     # Scripts (placeholder)
@@ -103,7 +102,7 @@ npx cdk destroy            # Destroy stacks
 
 A single `CoreLambda` (code from the external `elevensys-core` repo) is proxied
 onto the shared API Gateway for every service prefix — `jira`, `openai`,
-`urlify`, `claude-watch`, `audit` — via `ANY /{prefix}` and
+`urlify`, `audit` — via `ANY /{prefix}` and
 `ANY /{prefix}/{proxy+}`. All request routing, auth, and business logic
 happens inside elevensys-core's own app, not in this CDK repo. There used to
 be standalone `TimesheetCoreStack` and `UrlifyStack` constructs with their own
@@ -119,13 +118,6 @@ implementation lives in elevensys-core).
   caching for redirects via a dedicated `UrlifyRedirectApi` + `UrlifyRedirectDistribution`
 - **OpenAI** (`POST /openai`) — API key stored in SSM Parameter Store
   (`/openai/api-key`), read by `CoreStack` and injected as `OPENAI_API_KEY`
-- **Claude Watch** (`/claude-watch/*`) — `ClaudeWatchTable` construct in
-  `core-stack.ts`, single-table design (`PK`/`SK`), on-demand billing,
-  `removalPolicy: RETAIN` (analytics history), TTL attribute `TTL`.
-  GSIs: `GSI1` (by-date rollups + global sessions), `GSI2` (sessions by
-  developer), `GSI3` (sessions by project). Env var
-  `CLAUDE_WATCH_TABLE_NAME` injected into CoreLambda;
-  `grantReadWriteData(coreLambda)`
 - **Audit** (`/audit/*`)
 - **Autolog** — `AutologExecutorLambda` (also code from `elevensys-core`),
   triggered hourly via EventBridge (`AutologHourlyRule`), not exposed as an
@@ -190,7 +182,7 @@ GitHub Actions workflow (`.github/workflows/deploy.yml`):
 ## Key Design Patterns
 
 1. **Two-stack architecture** - `BaseApiStack` (shared API Gateway) + `CoreStack` (single proxy Lambda), all business logic delegated to the external `elevensys-core` repo
-2. **API Proxy** - `CoreLambda` handles every service prefix (`jira`, `openai`, `urlify`, `claude-watch`, `audit`) via `ANY {proxy+}` integrations
+2. **API Proxy** - `CoreLambda` handles every service prefix (`jira`, `openai`, `urlify`, `audit`) via `ANY {proxy+}` integrations
 3. **Asset-based deployment** - `CoreStack` bundles `elevensys-core`'s pre-built `dist/` output directly (`lambda.Code.fromAsset`), no local `NodejsFunction` bundling
 
 ## Important Files to Understand
@@ -214,7 +206,7 @@ new AWS resource (table, permission, env var) that `CoreLambda` needs.
 
 ### Modifying DynamoDB Schema
 
-1. Update the table construct (`UrlifyTable`, `AutologTable`, `ClaudeWatchTable`) in `lib/stacks/core-stack.ts` if key/GSI structure changes
+1. Update the table construct (`UrlifyTable`, `AutologTable`) in `lib/stacks/core-stack.ts` if key/GSI structure changes
 2. Update the corresponding type definitions in `elevensys-core`
 3. Consider migration strategy for existing data
 
