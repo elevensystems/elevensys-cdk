@@ -19,7 +19,6 @@ import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import * as events from 'aws-cdk-lib/aws-events';
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as ses from 'aws-cdk-lib/aws-ses';
 import { Architecture, Runtime, Tracing } from 'aws-cdk-lib/aws-lambda';
 import { RetentionDays } from 'aws-cdk-lib/aws-logs';
 import path from 'path';
@@ -31,7 +30,6 @@ export interface CoreStackProps extends StackProps {
   redirectDomain: string;
   urlifyHostedZoneId: string;
   urlifyCertificateArn: string;
-  fromEmail: string;
 }
 
 export class CoreStack extends Stack {
@@ -46,13 +44,6 @@ export class CoreStack extends Stack {
       sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: RemovalPolicy.RETAIN,
-    });
-
-    // =========================================================================
-    // SES: Email identity for elevensys.dev domain
-    // =========================================================================
-    new ses.EmailIdentity(this, 'ElevensysDomainIdentity', {
-      identity: ses.Identity.domain('elevensys.dev'),
     });
 
     const urlifyTable = new dynamodb.Table(this, 'UrlifyTable', {
@@ -155,7 +146,6 @@ export class CoreStack extends Stack {
         ANTHROPIC_API_KEY: anthropicApiKey.stringValue,
         CLOUDWATCH_LOG_GROUP: logGroup.logGroupName,
         APP_URL: props.baseApiUrl,
-        FROM_EMAIL: props.fromEmail,
         COGNITO_USER_POOL_ID: cognitoUserPoolId.stringValue,
         COGNITO_CLIENT_IDS: cognitoClientIds.stringValue,
         CORS_ALLOWED_ORIGINS: [
@@ -190,14 +180,6 @@ export class CoreStack extends Stack {
       new iam.PolicyStatement({
         actions: ['logs:StartQuery', 'logs:GetQueryResults', 'logs:StopQuery'],
         resources: [logGroup.logGroupArn],
-      })
-    );
-
-    // SES: send autolog notification emails from manual runs
-    coreLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-        resources: ['*'],
       })
     );
 
@@ -333,7 +315,6 @@ function handler(event) {
         NODE_ENV: 'production',
         AUTOLOG_TABLE_NAME: autologTable.tableName,
         APP_URL: props.baseApiUrl,
-        FROM_EMAIL: props.fromEmail,
       },
     });
 
@@ -346,14 +327,6 @@ function handler(event) {
         resources: [
           `arn:aws:ssm:${this.region}:${this.account}:parameter/autolog/*`,
         ],
-      })
-    );
-
-    // SES: send emails
-    executorLambda.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['ses:SendEmail', 'ses:SendRawEmail'],
-        resources: ['*'],
       })
     );
 
