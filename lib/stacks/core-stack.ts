@@ -30,6 +30,7 @@ export interface CoreStackProps extends StackProps {
   redirectDomain: string;
   urlifyHostedZoneId: string;
   urlifyCertificateArn: string;
+  pulseAppUrl: string;
 }
 
 export class CoreStack extends Stack {
@@ -146,6 +147,7 @@ export class CoreStack extends Stack {
         ANTHROPIC_API_KEY: anthropicApiKey.stringValue,
         CLOUDWATCH_LOG_GROUP: logGroup.logGroupName,
         APP_URL: props.baseApiUrl,
+        PULSE_APP_URL: props.pulseAppUrl,
         COGNITO_USER_POOL_ID: cognitoUserPoolId.stringValue,
         COGNITO_CLIENT_IDS: cognitoClientIds.stringValue,
         CORS_ALLOWED_ORIGINS: [
@@ -315,10 +317,20 @@ function handler(event) {
         NODE_ENV: 'production',
         AUTOLOG_TABLE_NAME: autologTable.tableName,
         APP_URL: props.baseApiUrl,
+        PULSE_APP_URL: props.pulseAppUrl,
+        // The executor never touches urlify, but it imports the shared
+        // `parseEnv()`, which validates the whole schema at module load and
+        // treats these two as required. Omitting them makes the function throw
+        // before the handler runs.
+        URLIFY_TABLE_NAME: urlifyTable.tableName,
+        URLIFY_BASE_URL: `https://${props.redirectDomain}`,
       },
     });
 
     autologTable.grantReadWriteData(executorLambda);
+
+    // The Teams webhook URL lives at /autolog/teams-webhook-url (SecureString),
+    // covered by the /autolog/* grant below alongside the per-user Jira tokens.
 
     // SSM: read Jira tokens stored at /autolog/*
     executorLambda.addToRolePolicy(
