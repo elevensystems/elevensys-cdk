@@ -120,7 +120,7 @@ implementation lives in elevensys-core).
   (`/openai/api-key`), read by `CoreStack` and injected as `OPENAI_API_KEY`
 - **Audit** (`/audit/*`)
 - **Autolog** — `AutologExecutorLambda` (also code from `elevensys-core`),
-  triggered hourly via EventBridge (`AutologHourlyRule`), not exposed as an
+  triggered every 15 minutes via EventBridge (`AutologTickRule`), not exposed as an
   HTTP route. Uses `AutologTable` and SSM params under `/autolog/*`.
 
 ## Lambda Development

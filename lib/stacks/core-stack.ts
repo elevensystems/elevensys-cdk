@@ -330,11 +330,17 @@ function handler(event) {
       })
     );
 
-    // Trigger every hour
-    new events.Rule(this, 'AutologHourlyRule', {
-      schedule: events.Schedule.rate(Duration.hours(1)),
+    // Every 15 minutes, on the quarter hour.
+    //
+    // Configs store an exact `nextRunAt` instant and are picked up when
+    // `nextRunAt <= now`, so the tick is a resolution knob, not a schedule:
+    //  - it spreads users across the hour instead of bunching them on it
+    //  - it bounds how long after a Jira outage ends a due run has to wait
+    // `cron` rather than `rate` because rate() drifts from the deploy time.
+    new events.Rule(this, 'AutologTickRule', {
+      schedule: events.Schedule.cron({ minute: '0/15' }),
       targets: [new eventsTargets.LambdaFunction(executorLambda)],
-      description: 'Triggers autolog executor every hour',
+      description: 'Triggers the autolog executor every 15 minutes',
     });
   }
 }
