@@ -9,7 +9,7 @@
 - **OpenAI API Wrapper** - `/openai` proxied access to OpenAI's API
 - **Audit** - `/audit/*`
 
-All routes share the common API Gateway at `api.elevensys.dev`. There used to be standalone `TimesheetCoreStack`, `UrlifyStack`, and `OpenAIStack` constructs with their own Lambdas under `resources/lambda/` in this repo — they were removed once `CoreStack`/elevensys-core took over all routing. Any change to service behavior now happens in the `elevensys-core` repo, not here.
+All routes share the common API Gateway at `api.elevensystems.dev`. There used to be standalone `TimesheetCoreStack`, `UrlifyStack`, and `OpenAIStack` constructs with their own Lambdas under `resources/lambda/` in this repo — they were removed once `CoreStack`/elevensys-core took over all routing. Any change to service behavior now happens in the `elevensys-core` repo, not here.
 
 ## Tech Stack
 
@@ -36,7 +36,7 @@ elevensys-cdk/
 │   └── elevensys-cdk.ts         # Main application - stack orchestration
 ├── lib/
 │   └── stacks/                  # CDK stack definitions
-│       ├── base-api-stack.ts    # Shared API Gateway (api.elevensys.dev)
+│       ├── base-api-stack.ts    # Shared API Gateway (api.elevensystems.dev)
 │       └── core-stack.ts        # CoreLambda (serves /jira, /openai, /urlify, /audit + autolog)
 ├── test/                        # Jest unit tests
 ├── docs/                        # Documentation (API.md - full API reference)
@@ -94,7 +94,7 @@ npx cdk destroy            # Destroy stacks
 
 ### BaseApiStack (Foundation)
 
-- Centralized REST API Gateway at `api.elevensys.dev`
+- Centralized REST API Gateway at `api.elevensystems.dev`
 - All other stacks attach their resources to this API
 - Handles SSL certificate and Route53 DNS
 
@@ -148,8 +148,8 @@ Required in `.env` for CDK deployment:
 CDK_DEFAULT_ACCOUNT=<AWS account ID>
 CDK_DEFAULT_REGION=<AWS region>
 
-# Base API Gateway (api.elevensys.dev)
-BASE_DOMAIN_NAME=api.elevensys.dev
+# Base API Gateway (api.elevensystems.dev)
+BASE_DOMAIN_NAME=api.elevensystems.dev
 BASE_HOSTED_ZONE_ID=<Route53 zone ID>
 BASE_CERTIFICATE_ARN=<ACM certificate ARN>
 

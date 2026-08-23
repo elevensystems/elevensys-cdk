@@ -36,7 +36,7 @@ const env = {
   region: process.env.CDK_DEFAULT_REGION!,
 };
 
-// Configuration for base API domain (api.elevensys.dev)
+// Configuration for base API domain (api.elevensystems.dev)
 const baseDomainName = process.env.BASE_DOMAIN_NAME!;
 const baseHostedZoneId = process.env.BASE_HOSTED_ZONE_ID!;
 const baseCertificateArn = process.env.BASE_CERTIFICATE_ARN!;

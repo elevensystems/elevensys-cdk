@@ -1,6 +1,6 @@
 # Elevensys CDK - API Reference
 
-Base domain: `https://api.elevensys.dev`
+Base domain: `https://api.elevensystems.dev`
 
 ---
 

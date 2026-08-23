@@ -8,7 +8,7 @@ import { Construct } from 'constructs';
 /**
  * BaseApiStack - Shared API Gateway for all services
  *
- * This stack creates a centralized API Gateway with custom domain (api.elevensys.dev)
+ * This stack creates a centralized API Gateway with custom domain (api.elevensystems.dev)
  * that serves as the base for all microservices.
  *
  * Architecture:
@@ -27,7 +27,7 @@ import { Construct } from 'constructs';
  */
 export interface BaseApiStackProps extends StackProps {
   /**
-   * Custom domain name for the API (e.g., 'api.elevensys.dev')
+   * Custom domain name for the API (e.g., 'api.elevensystems.dev')
    */
   domainName: string;
 
