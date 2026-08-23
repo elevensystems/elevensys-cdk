@@ -5,8 +5,8 @@
     "elevensys-cdk": "bin/elevensys-cdk.js"
   },
   "scripts": {
-    "build": "tsc",
-    "watch": "tsc -w",
+    "build": "tsc --noEmit",
+    "watch": "tsc -w --noEmit",
     "test": "jest",
     "cdk": "cdk",
     "format": "prettier --write \"**/*.ts\"",
