@@ -123,7 +123,7 @@ export class CoreStack extends Stack {
     };
 
     const logGroup = new logs.LogGroup(this, 'CoreLambdaLogGroup', {
-      retention: RetentionDays.ONE_MONTH,
+      retention: RetentionDays.ONE_YEAR,
     });
 
     const coreLambda = new lambda.Function(this, 'CoreLambda', {
@@ -299,7 +299,7 @@ function handler(event) {
     const executorLogGroup = new logs.LogGroup(
       this,
       'AutologExecutorLogGroup',
-      { retention: RetentionDays.ONE_MONTH }
+      { retention: RetentionDays.ONE_YEAR }
     );
 
     const executorLambda = new lambda.Function(this, 'AutologExecutorLambda', {

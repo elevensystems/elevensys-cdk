@@ -137,7 +137,7 @@ all live in `elevensys-core`, not here — go there to change Lambda behavior.
 - **Runtime:** Node.js 22.x (`Runtime.NODEJS_22_X`)
 - **Architecture:** ARM64 (cost optimized)
 - **Tracing:** X-Ray active
-- **Log Retention:** 1 month (dedicated log groups per Lambda)
+- **Log Retention:** 1 year (dedicated log groups per Lambda)
 
 ## Environment Variables
 
