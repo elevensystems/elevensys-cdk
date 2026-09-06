@@ -8,6 +8,12 @@
 - **URL Shortener (Urlify)** - `/urlify/*` admin API plus the `urlify.cc` redirect domain
 - **OpenAI API Wrapper** - `/openai` proxied access to OpenAI's API
 - **Audit** - `/audit/*`
+- **Autolog admin** - `/autolog/*` staff-only autolog oversight, gated on the Cognito `admin` group
+
+`AutologTable` carries the GSI `AutologScheduleIndex` (`GSI1PK`/`GSI1SK`), which
+replaces the table Scans behind the 15-minute autolog executor and the admin
+list. Key shape and the required backfill are documented at the construct in
+`core-stack.ts` and in elevensys-core's CLAUDE.md.
 
 All routes share the common API Gateway at `api.elevensystems.dev`. There used to be standalone `TimesheetCoreStack`, `UrlifyStack`, and `OpenAIStack` constructs with their own Lambdas under `resources/lambda/` in this repo — they were removed once `CoreStack`/elevensys-core took over all routing. Any change to service behavior now happens in the `elevensys-core` repo, not here.
 
@@ -37,7 +43,7 @@ elevensys-cdk/
 ├── lib/
 │   └── stacks/                  # CDK stack definitions
 │       ├── base-api-stack.ts    # Shared API Gateway (api.elevensystems.dev)
-│       └── core-stack.ts        # CoreLambda (serves /jira, /openai, /urlify, /audit + autolog)
+│       └── core-stack.ts        # CoreLambda (serves /jira, /openai, /urlify, /audit, /autolog)
 ├── test/                        # Jest unit tests
 ├── docs/                        # Documentation (API.md - full API reference)
 ├── scripts/                     # Scripts (placeholder)
@@ -209,6 +215,21 @@ new AWS resource (table, permission, env var) that `CoreLambda` needs.
 1. Update the table construct (`UrlifyTable`, `AutologTable`) in `lib/stacks/core-stack.ts` if key/GSI structure changes
 2. Update the corresponding type definitions in `elevensys-core`
 3. Consider migration strategy for existing data
+
+**A new GSI needs a backfill.** DynamoDB indexes only items that already carry
+the index's key attributes, so rows written before the deploy are invisible to
+it — they are not "missing from the results", they are missing from the feature.
+Add the keys in `elevensys-core` on every write path first, deploy the index,
+then run the repo's backfill over existing rows. `AutologScheduleIndex` is the
+worked example: `pnpm run autolog:index backfill` in elevensys-core.
+
+`grantReadWriteData` covers `${Table.Arn}/index/*` automatically, so the Lambda
+roles pick up index permissions with the same deploy. An index created by hand
+with `aws dynamodb update-table` would *not* get them — the queries would fail
+`AccessDenied` — and would drift from this stack. Add GSIs here, not by CLI.
+
+CloudFormation adds **one GSI per deploy** per table; two new indexes on one
+table need two successive deploys.
 
 ## Troubleshooting
 

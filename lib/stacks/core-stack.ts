@@ -47,6 +47,13 @@ export class CoreStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     });
 
+    autologTable.addGlobalSecondaryIndex({
+      indexName: 'AutologScheduleIndex',
+      partitionKey: { name: 'GSI1PK', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'GSI1SK', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
     const urlifyTable = new dynamodb.Table(this, 'UrlifyTable', {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -193,7 +200,7 @@ export class CoreStack extends Stack {
       proxy: true,
     });
 
-    for (const prefix of ['jira', 'openai', 'urlify', 'audit']) {
+    for (const prefix of ['jira', 'openai', 'urlify', 'audit', 'autolog']) {
       const resource = props.api.root.addResource(prefix);
       resource.addMethod('ANY', integration);
       resource.addResource('{proxy+}').addMethod('ANY', integration);
