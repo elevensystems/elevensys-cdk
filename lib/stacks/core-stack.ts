@@ -311,6 +311,11 @@ function handler(event) {
       }),
       timeout: Duration.minutes(5),
       memorySize: 256,
+      // Both callers invoke asynchronously, and Lambda would redeliver a failed
+      // event up to twice. A retried manual run messages the user again and can
+      // race the run a second click started; a retried tick only repeats what
+      // the next tick, 15 minutes later, does anyway.
+      retryAttempts: 0,
       tracing: Tracing.ACTIVE,
       logGroup: executorLogGroup,
       environment: {

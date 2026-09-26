@@ -125,6 +125,8 @@ implementation lives in elevensys-core).
   HTTP route. Uses `AutologTable` and SSM params under `/autolog/*`. `CoreLambda`
   also invokes it asynchronously for a manual "Run now" (`grantInvoke` +
   `AUTOLOG_EXECUTOR_FUNCTION_NAME`), since a run outlasts API Gateway's 29s limit.
+  `retryAttempts: 0` — a redelivered manual run would message the user twice and
+  could race a newer run; a missed tick is covered by the next one.
 
 ## Lambda Development
 
