@@ -342,6 +342,15 @@ function handler(event) {
       })
     );
 
+    // Manual "Run now": CoreLambda hands the run to the executor with an async
+    // invoke and returns 202. Logging a month of worklogs takes longer than API
+    // Gateway's 29s integration limit, so it cannot happen inside the request.
+    coreLambda.addEnvironment(
+      'AUTOLOG_EXECUTOR_FUNCTION_NAME',
+      executorLambda.functionName
+    );
+    executorLambda.grantInvoke(coreLambda);
+
     // Every 15 minutes, on the quarter hour.
     //
     // Configs store an exact `nextRunAt` instant and are picked up when

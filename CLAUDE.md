@@ -122,7 +122,9 @@ implementation lives in elevensys-core).
 - **Audit** (`/audit/*`)
 - **Autolog** — `AutologExecutorLambda` (also code from `elevensys-core`),
   triggered every 15 minutes via EventBridge (`AutologTickRule`), not exposed as an
-  HTTP route. Uses `AutologTable` and SSM params under `/autolog/*`.
+  HTTP route. Uses `AutologTable` and SSM params under `/autolog/*`. `CoreLambda`
+  also invokes it asynchronously for a manual "Run now" (`grantInvoke` +
+  `AUTOLOG_EXECUTOR_FUNCTION_NAME`), since a run outlasts API Gateway's 29s limit.
 
 ## Lambda Development
 
