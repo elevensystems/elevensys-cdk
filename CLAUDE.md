@@ -8,6 +8,7 @@
 - **URL Shortener (Urlify)** - `/urlify/*` admin API plus the `urlify.cc` redirect domain
 - **OpenAI API Wrapper** - `/openai` proxied access to OpenAI's API
 - **Audit** - `/audit/*`
+- **Autolog admin** - `/autolog/*` staff-only autolog oversight, gated on the Cognito `admin` group
 
 All routes share the common API Gateway at `api.elevensystems.dev`. There used to be standalone `TimesheetCoreStack`, `UrlifyStack`, and `OpenAIStack` constructs with their own Lambdas under `resources/lambda/` in this repo — they were removed once `CoreStack`/elevensys-core took over all routing. Any change to service behavior now happens in the `elevensys-core` repo, not here.
 
@@ -37,7 +38,7 @@ elevensys-cdk/
 ├── lib/
 │   └── stacks/                  # CDK stack definitions
 │       ├── base-api-stack.ts    # Shared API Gateway (api.elevensystems.dev)
-│       └── core-stack.ts        # CoreLambda (serves /jira, /openai, /urlify, /audit + autolog)
+│       └── core-stack.ts        # CoreLambda (serves /jira, /openai, /urlify, /audit, /autolog)
 ├── test/                        # Jest unit tests
 ├── docs/                        # Documentation (API.md - full API reference)
 ├── scripts/                     # Scripts (placeholder)
