@@ -47,6 +47,20 @@ export class CoreStack extends Stack {
       removalPolicy: RemovalPolicy.RETAIN,
     });
 
+    // =========================================================================
+    // DynamoDB: Pulse worklog profiles (per user, per Jira instance + project)
+    // =========================================================================
+    const worklogProfilesTable = new dynamodb.Table(
+      this,
+      'WorklogProfilesTable',
+      {
+        partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
+        sortKey: { name: 'SK', type: dynamodb.AttributeType.STRING },
+        billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+        removalPolicy: RemovalPolicy.RETAIN,
+      }
+    );
+
     const urlifyTable = new dynamodb.Table(this, 'UrlifyTable', {
       partitionKey: { name: 'PK', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
@@ -144,6 +158,7 @@ export class CoreStack extends Stack {
         URLIFY_BASE_URL: `https://${props.redirectDomain}`,
         OPENAI_API_KEY: openaiApiKey.stringValue,
         AUTOLOG_TABLE_NAME: autologTable.tableName,
+        WORKLOG_PROFILES_TABLE_NAME: worklogProfilesTable.tableName,
         ANTHROPIC_API_KEY: anthropicApiKey.stringValue,
         CLOUDWATCH_LOG_GROUP: logGroup.logGroupName,
         APP_URL: props.baseApiUrl,
@@ -162,6 +177,7 @@ export class CoreStack extends Stack {
     openaiApiKey.grantRead(coreLambda);
     anthropicApiKey.grantRead(coreLambda);
     autologTable.grantReadWriteData(coreLambda);
+    worklogProfilesTable.grantReadWriteData(coreLambda);
 
     // Allow coreLambda to read/write SSM parameters for autolog tokens
     coreLambda.addToRolePolicy(

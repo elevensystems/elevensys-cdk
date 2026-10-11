@@ -5,6 +5,7 @@
 **elevensys-cdk** is an AWS CDK infrastructure-as-code project written in TypeScript. This repo only defines two stacks — `BaseApiStack` (the shared API Gateway) and `CoreStack` (a single Lambda, `CoreLambda`, that proxies every service route). All actual request-handling logic lives in the external sibling repo **elevensys-core**, which `CoreStack` pulls in as a pre-built Lambda asset (see `ELEVENSYS_CORE_PATH` in `core-stack.ts`). `CoreStack` fronts:
 
 - **Jira Timesheet Integration** - `/jira/*` proxy to Jira APIs for worklog management
+- **Worklog profiles** - `/jira/worklog-profiles` stores Pulse's Log Work profiles in `WorklogProfilesTable` (`PK = USER#<username>`, `SK = <jiraInstance>#<projectId>`), so they follow the user across machines
 - **URL Shortener (Urlify)** - `/urlify/*` admin API plus the `urlify.cc` redirect domain
 - **OpenAI API Wrapper** - `/openai` proxied access to OpenAI's API
 - **Audit** - `/audit/*`
